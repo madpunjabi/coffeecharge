@@ -145,7 +145,7 @@ The Trip Planner lets users sequence charging stops for long drives, estimate ch
 
 * Multi-filter combinations: Fast Charger (150kW+) \+ Starbucks \+ Restrooms \+ Open Now in a single search
 
-* Results ranked by composite C\&C Score
+* Results ranked by composite C\&C Score when no destination is set; when a destination is entered, results are sorted by lowest detour distance first, then by C\&C Score as a tiebreaker
 
 ### **Charge Confidence Score (Live)**
 
@@ -153,7 +153,7 @@ The Trip Planner lets users sequence charging stops for long drives, estimate ch
 
 * ChargePoint API integration for live stall availability (V1.1 — access pending; abstraction layer built at MVP so it slots in without a rewrite)
 
-* Community check-in system: one-tap “Is this charger working?” on arrival
+* Community check-in system: one-tap “Check In” button on the stop detail sheet; immediately logs “working” status; toast confirmation + button state change to “Checked In ✓”. No form or multi-step flow.
 
 * Reliability badge: Green (90%+ uptime), Amber (70–90%), Red (\<70% or recent failure reports)
 
@@ -307,9 +307,11 @@ All APIs used in the stack, with links to documentation, sign-up pages, and acce
 
 # **8\. UI Direction**
 
+> **Design mocks:** `docs/designmocks.zip` — extract for full-fidelity screen designs covering the map view, filter bar, stop cards, stop detail screen, and score breakdowns. These mocks are the source of truth for implementation; the written specs below are supplementary.
+
 ## **8.1 Design Principles**
 
-* **Decisions in 2 taps.**  The primary flow (set range → add amenity filter → see ranked results) must complete in no more than 2 user interactions from app launch. Non-negotiable.
+* **Decisions in 2 taps.**  Results are visible immediately on app open (0 taps). The primary filter flow (tap a range pill → tap an amenity filter) adds at most 2 interactions before ranked results update. Non-negotiable.
 
 * **Calm confidence.**  EV travel is already anxiety-inducing. The design should feel settled and trustworthy — never busy or alarming.
 
@@ -333,14 +335,14 @@ All APIs used in the stack, with links to documentation, sign-up pages, and acce
 
 ### **Filter Bar**
 
-Horizontally scrolling brand pills at the top of the map screen. Brand logos (not text) for major chains — instantly recognizable at a glance. Examples:
+Horizontally scrolling brand pills at the top of the map screen. Text labels with icons (not brand logo images) for MVP — simpler to ship, accessible, and consistent across brand and non-brand filters alike. Brand logo images are a V1.1 polish upgrade. Examples:
 
 |   FILTER BAR EXAMPLE \[ ⚡ Fast 150kW+ \]  \[ Starbucks logo \]  \[ McDonald’s logo \]  \[ 🚹 Restrooms \]  \[ 📶 Wifi \]  \[ 🛒 Grocery \]  \[ 🏨 Hotel \] |
 | :---- |
 
 ### **Stop Card**
 
-Each card shows: charger network logo, power level badge (e.g. “150 kW”), stall count / available stalls, Charge Confidence Score (⚡ bolts), top 3 amenities as brand logos with walking time, Brew Score (☕ cups), C\&C Score headline, detour distance from route.
+Each card shows: charger network badge, reliability badge, station name, distance + detour label (“On route” or “+X mi detour”), C\&C Score (top-right), Charge Confidence Score (⚡ bolts out of 5 + decimal), Brew Score (☕ cups out of 5 + decimal), kW badge, stall availability (X/Y color-coded green/red), price/kWh, amenity pills, “Last verified” timestamp. The C\&C Score tier label (e.g. “Excellent”) is shown beneath the numeric score on the card.
 
 ### **Stop Detail Screen**
 
@@ -441,12 +443,22 @@ The following decisions were made during engineering readiness review (February 
 | Decision | Choice | Rationale |
 | :---- | :---- | :---- |
 | Geographic scope | Full US from day one | Overture Maps is free; no marginal cost for broader coverage |
-| Authentication | Sign-up required at launch | Enables check-in attribution and preference profiles; uses InstantDB built-in auth |
+| Authentication | Soft gate — map visible immediately; sign-up prompted before full access | Map loads without auth; sign-up required for check-in and saving stops; uses InstantDB built-in auth |
 | Geospatial queries | Bounding box (InstantDB) \+ client-side radius filter | InstantDB has no native geo queries; `lat`/`lng` stored as indexed fields; viewport bounding box queried, exact radius filtered client-side |
 | ChargePoint API | Defer to V1.1; abstraction layer at MVP | Access not yet granted; `ChargerStatusProvider` interface ensures zero-rewrite integration when approved |
 | Amenity data source | Overture Maps \+ Geoapify | Google Places and Foursquare eliminated; Overture (free) for locations/hours; Geoapify (3k free credits/day) for ratings enrichment only |
 | Vehicle profile | Deferred to P1 | Full energy model too complex for MVP; range slider used instead |
 | Score formula | Charge Confidence \+ Brew Score = C\&C Score | Sum, not average; both scores 0–5, sum is 0–10 |
+| Range slider | Single-handle radius from GPS (MVP) | Sets search radius from current location; route corridor deferred to P1 trip planner |
+| Result sort order | No destination: C\&C Score descending. With destination: detour distance ascending, then C\&C Score | Detour distance is the primary constraint on a road trip; score breaks ties |
+| Fallback station selection | Nearest by distance to the current stop | Simple, predictable; no threshold or score requirement |
+| Check-in interaction | One-tap: logs "working" instantly; toast + button state change | Minimises friction; no form or multi-step flow at MVP |
+| Score tier label on card | Shown on stop card below numeric score | e.g. "Excellent" below "8.4"; label also appears in detail sheet |
+| Loading / error states | Skeleton screens while loading; stale cached data with "⚠️ Data may be outdated" banner on failure | Never hide content entirely; maintain trust through transparency |
+| Promoted content | Deferred to P1 | All MVP results are organic; no sponsored placement |
+| Component library | Shadcn/ui \+ Radix UI; Drawer (vaul) for detail sheet | Selected in design mocks; consistent with existing `components.json` |
+| Typeface | Geist (sans), Geist Mono | Set in `@theme inline` in `globals.css` |
+| Dark mode | In scope for MVP | Full dark palette defined; see `docs/designmocks.zip` |
 
 ## **9.8 Implementation Roadmap**
 
