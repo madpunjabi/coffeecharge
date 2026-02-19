@@ -15,8 +15,10 @@ import { FilterBar } from "@/components/filter-bar"
 import { StopCard } from "@/components/stop-card"
 import { StopDetailSheet } from "@/components/stop-detail-sheet"
 import { SearchBar } from "@/components/search-bar"
+import { AuthGate } from "@/components/auth/auth-gate"
 import { Zap, Coffee, SlidersHorizontal, ChevronUp, ChevronDown, List, Map as MapIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useAuthGate } from "@/hooks/use-auth-gate"
 
 type ViewMode = "map" | "list"
 type PanelState = "collapsed" | "peek" | "expanded"
@@ -33,6 +35,7 @@ export default function Home() {
 
   const { position } = useGeolocation()
   const { stops, isLoading, isStale } = useStationQuery(bounds)
+  const { user, showGate, setShowGate } = useAuthGate()
 
   const stopsWithDistance = useMemo(() => {
     if (!position) return stops
@@ -153,10 +156,10 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => {/* auth gate — wired in Phase 3 */}}
+              onClick={() => !user && setShowGate(true)}
               className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted active:scale-95"
             >
-              Sign In
+              {user ? "My Stops" : "Sign In"}
             </button>
           </div>
         </div>
@@ -386,6 +389,9 @@ export default function Home() {
         isOpen={isDetailOpen}
         onClose={handleDetailClose}
       />
+
+      {/* Auth gate */}
+      <AuthGate isOpen={showGate} onClose={() => setShowGate(false)} />
 
     </main>
   )
