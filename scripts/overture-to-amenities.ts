@@ -47,8 +47,14 @@ function haversineMeters(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-function degreesDelta(meters: number): number {
-  return meters / 111_320 // rough degrees per metre at any US latitude
+/** Latitude delta is constant: 1 degree ≈ 111,320 m everywhere. */
+function latDelta(meters: number): number {
+  return meters / 111_320
+}
+
+/** Longitude delta shrinks toward the poles: must be adjusted by cos(lat). */
+function lngDelta(meters: number, lat: number): number {
+  return meters / (111_320 * Math.cos((lat * Math.PI) / 180))
 }
 
 // ── InstantDB admin client ─────────────────────────────────────────────────
@@ -74,11 +80,12 @@ function queryPoisNear(
   stopLat: number,
   stopLng: number
 ): Promise<OvertureRow[]> {
-  const delta = degreesDelta(RADIUS_METERS)
-  const minLat = stopLat - delta
-  const maxLat = stopLat + delta
-  const minLng = stopLng - delta
-  const maxLng = stopLng + delta
+  const latD = latDelta(RADIUS_METERS)
+  const lngD = lngDelta(RADIUS_METERS, stopLat)
+  const minLat = stopLat - latD
+  const maxLat = stopLat + latD
+  const minLng = stopLng - lngD
+  const maxLng = stopLng + lngD
 
   const sql = `
     SELECT id, name, category, lng, lat, opening_hours, brand
@@ -128,10 +135,24 @@ async function main() {
       continue
     }
 
+    // Idempotency: skip POIs already seeded for this stop
+    const existing = await db.query({
+      amenities: { $: { where: { stopId: stop.id } } },
+    })
+    const existingOvertureIds = new Set(
+      (existing.amenities ?? []).map((a: { overtureId: string }) => a.overtureId)
+    )
+    const toInsert = nearby.filter(poi => !existingOvertureIds.has(poi.id))
+
+    if (toInsert.length === 0) {
+      processed++
+      continue
+    }
+
     // Build InstantDB transactions
     const txns: ReturnType<typeof db.tx.amenities[string]["update"]>[] = []
 
-    for (const poi of nearby) {
+    for (const poi of toInsert) {
       const distM = haversineMeters(stop.lat, stop.lng, poi.lat, poi.lng)
       const amenityId = id()
       const category = CATEGORY_MAP[poi.category] ?? "retail"
@@ -166,7 +187,7 @@ async function main() {
       await db.transact(batch)
     }
 
-    totalAmenities += nearby.length
+    totalAmenities += toInsert.length
     processed++
 
     if (processed % 50 === 0) {

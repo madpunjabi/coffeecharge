@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useRef, useCallback } from "react"
+import { useEffect, useRef } from "react"
 import mapboxgl from "mapbox-gl"
 import "mapbox-gl/dist/mapbox-gl.css"
 import type { Station } from "@/lib/types"
@@ -20,6 +20,11 @@ export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoun
   const map = useRef<mapboxgl.Map | null>(null)
   const stationsRef = useRef(stations)
   stationsRef.current = stations
+  // Use refs for callbacks to avoid map remounts when parent re-renders
+  const onSelectRef = useRef(onSelectStation)
+  onSelectRef.current = onSelectStation
+  const onBoundsRef = useRef(onBoundsChange)
+  onBoundsRef.current = onBoundsChange
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return
@@ -91,16 +96,21 @@ export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoun
         const stationId = e.features?.[0]?.properties?.stationId
         if (!stationId) return
         const station = stationsRef.current.find(s => s.id === stationId)
-        if (station) onSelectStation(station)
+        if (station) onSelectRef.current(station)
       })
 
       map.current!.on("moveend", () => {
-        onBoundsChange?.(map.current!.getBounds()!)
+        onBoundsRef.current?.(map.current!.getBounds()!)
+      })
+
+      // Fire initial bounds once the map has finished its first render
+      map.current!.once("idle", () => {
+        onBoundsRef.current?.(map.current!.getBounds()!)
       })
     })
 
     return () => { map.current?.remove(); map.current = null }
-  }, [onSelectStation, onBoundsChange])
+  }, [])
 
   // Update GeoJSON when stations change
   useEffect(() => {

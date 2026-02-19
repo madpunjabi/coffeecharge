@@ -69,6 +69,10 @@ export default function Home() {
     setIsDetailOpen(false)
   }, [])
 
+  const handleBoundsChange = useCallback((b: { getNorth: () => number; getSouth: () => number; getEast: () => number; getWest: () => number }) => {
+    setBounds({ north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() })
+  }, [])
+
   const cyclePanelState = useCallback(() => {
     setPanelState((prev) => {
       if (prev === "collapsed") return "peek"
@@ -120,7 +124,7 @@ export default function Home() {
       }
       return true
     })
-  }, [activeFilters])
+  }, [activeFilters, stopsWithDistance])
 
   const sortedStations = useMemo(
     () => [...filteredStations].sort((a, b) => b.ccScore - a.ccScore),
@@ -205,7 +209,7 @@ export default function Home() {
               stations={filteredStations}
               selectedStationId={selectedStation?.id ?? null}
               onSelectStation={handleStationSelect}
-              onBoundsChange={(b) => setBounds({ north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() })}
+              onBoundsChange={handleBoundsChange}
               className="h-full"
             />
 
@@ -270,7 +274,10 @@ export default function Home() {
                   className="flex gap-3 overflow-x-auto px-4 pb-4 pt-1"
                   style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
                 >
-                  {sortedStations.map((station) => (
+                  {isLoading && [1, 2, 3].map(i => (
+                    <div key={i} className="h-[160px] w-[280px] shrink-0 rounded-xl bg-muted animate-pulse" />
+                  ))}
+                  {!isLoading && sortedStations.map((station) => (
                     <div key={station.id} className="w-[280px] shrink-0">
                       <StopCard
                         station={station}
@@ -280,7 +287,7 @@ export default function Home() {
                       />
                     </div>
                   ))}
-                  {sortedStations.length === 0 && (
+                  {!isLoading && sortedStations.length === 0 && (
                     <div className="flex w-full flex-col items-center justify-center py-4 text-center">
                       <SlidersHorizontal className="mb-2 h-6 w-6 text-muted-foreground/40" aria-hidden="true" />
                       <p className="text-xs font-medium text-muted-foreground">No stops match your filters</p>
