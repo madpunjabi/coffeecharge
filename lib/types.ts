@@ -47,6 +47,7 @@ export interface Amenity {
   rating: number               // 0–5, from Geoapify; 0 = no data
   hours: string                // e.g. "6am–10pm" or "Unknown"
   hoursJson?: string           // raw OSM hours format for client-side isOpenNow calc
+  isOpenNow?: boolean          // computed client-side from hoursJson
   lat: number
   lng: number
   overtureId?: string
@@ -92,15 +93,16 @@ export interface FilterOption {
 export interface ScoreTier {
   label: string
   colorClass: string
+  color: string  // CSS variable key, e.g. "cc-gold"
 }
 
 export function getScoreTier(score: number): ScoreTier {
-  if (score >= 9.0) return { label: "Perfect Stop", colorClass: "text-cc-gold" }
-  if (score >= 8.0) return { label: "Excellent Stop", colorClass: "text-cc-charge-blue" }
-  if (score >= 7.0) return { label: "Great Stop", colorClass: "text-cc-brew-green" }
-  if (score >= 6.0) return { label: "Good Stop", colorClass: "text-cc-brew-green" }
-  if (score >= 5.0) return { label: "Decent Stop", colorClass: "text-cc-caution-amber" }
-  return { label: "Proceed with Caution", colorClass: "text-cc-alert-red" }
+  if (score >= 9.0) return { label: "Perfect Stop", colorClass: "text-cc-gold", color: "cc-gold" }
+  if (score >= 8.0) return { label: "Excellent Stop", colorClass: "text-cc-charge-blue", color: "cc-charge-blue" }
+  if (score >= 7.0) return { label: "Great Stop", colorClass: "text-cc-brew-green", color: "cc-brew-green" }
+  if (score >= 6.0) return { label: "Good Stop", colorClass: "text-cc-brew-green", color: "cc-brew-green" }
+  if (score >= 5.0) return { label: "Decent Stop", colorClass: "text-cc-caution-amber", color: "cc-caution-amber" }
+  return { label: "Proceed with Caution", colorClass: "text-cc-alert-red", color: "cc-alert-red" }
 }
 
 export interface BoundingBox {
