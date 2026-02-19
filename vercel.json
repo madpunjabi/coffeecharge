@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/refresh-brew-scores",
+      "schedule": "0 2 * * 0"
+    },
+    {
+      "path": "/api/cron/sync-nrel",
+      "schedule": "0 3 * * 1"
+    }
+  ]
+}
