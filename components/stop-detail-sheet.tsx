@@ -9,6 +9,7 @@ import { ChargerGrid } from "./charger-grid"
 import { AmenityList } from "./amenity-list"
 import { ScoreBreakdown } from "./score-breakdown"
 import { FallbackStation } from "./fallback-station"
+import { AuthGate } from "./auth/auth-gate"
 import {
   Drawer,
   DrawerContent,
@@ -17,6 +18,9 @@ import {
   DrawerDescription,
 } from "@/components/ui/drawer"
 import { MapPin, Zap, Navigation, Bookmark, UserCheck, Camera, X, Route } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { useCheckIn } from "@/hooks/use-check-in"
+import { useAuthGate } from "@/hooks/use-auth-gate"
 
 interface StopDetailSheetProps {
   station: Station | null
@@ -33,11 +37,17 @@ const networkLabels: Record<string, string> = {
 }
 
 export function StopDetailSheet({ station, isOpen, onClose }: StopDetailSheetProps) {
+  const { checkIn, checkedInStopIds, pendingStopId } = useCheckIn()
+  const { requireAuth, showGate, setShowGate } = useAuthGate()
+
   if (!station) return null
 
   const availableStalls = station.stalls.filter((s) => s.status === "available").length
+  const isCheckedIn = checkedInStopIds.has(station.id)
+  const isPending = pendingStopId === station.id
 
   return (
+    <>
     <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DrawerContent className="max-h-[85vh] bg-card">
         <div className="overflow-y-auto">
@@ -169,10 +179,17 @@ export function StopDetailSheet({ station, isOpen, onClose }: StopDetailSheetPro
               </button>
               <button
                 type="button"
-                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
+                disabled={isCheckedIn || isPending}
+                onClick={() => requireAuth(() => checkIn(station.id))}
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-xl border px-4 py-3.5 text-sm font-semibold transition-colors active:scale-[0.98]",
+                  isCheckedIn
+                    ? "border-cc-brew-green/30 bg-cc-brew-green/10 text-cc-brew-green"
+                    : "border-border bg-card text-foreground hover:bg-muted"
+                )}
               >
                 <UserCheck className="h-4 w-4" aria-hidden="true" />
-                Check In
+                {isCheckedIn ? "Checked In ✓" : isPending ? "Checking in..." : "Check In"}
               </button>
               <button
                 type="button"
@@ -186,5 +203,11 @@ export function StopDetailSheet({ station, isOpen, onClose }: StopDetailSheetPro
         </div>
       </DrawerContent>
     </Drawer>
+    <AuthGate
+      isOpen={showGate}
+      onClose={() => setShowGate(false)}
+      onSuccess={() => checkIn(station.id)}
+    />
+    </>
   )
 }
