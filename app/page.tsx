@@ -1,9 +1,16 @@
 "use client"
 
 import { useState, useCallback, useMemo, useRef } from "react"
-import type { Station } from "@/lib/types"
-import { stations } from "@/lib/mock-data"
-import { MapPlaceholderStub as MapPlaceholder } from "@/components/map/map-placeholder-stub"
+import type { Station, BoundingBox } from "@/lib/types"
+import dynamic from "next/dynamic"
+import { useStationQuery } from "@/hooks/use-station-query"
+import { useGeolocation } from "@/hooks/use-geolocation"
+import { haversineDistanceMiles } from "@/lib/geo/distance"
+
+const MapPlaceholder = dynamic(
+  () => import("@/components/map/mapbox-map").then(m => ({ default: m.MapboxMap })),
+  { ssr: false, loading: () => <div className="h-full bg-muted/20 animate-pulse" /> }
+)
 import { FilterBar } from "@/components/filter-bar"
 import { StopCard } from "@/components/stop-card"
 import { StopDetailSheet } from "@/components/stop-detail-sheet"
@@ -21,7 +28,19 @@ export default function Home() {
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<ViewMode>("map")
   const [panelState, setPanelState] = useState<PanelState>("peek")
+  const [bounds, setBounds] = useState<BoundingBox | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
+
+  const { position } = useGeolocation()
+  const { stops, isLoading, isStale } = useStationQuery(bounds)
+
+  const stopsWithDistance = useMemo(() => {
+    if (!position) return stops
+    return stops.map(s => ({
+      ...s,
+      distanceMiles: Math.round(haversineDistanceMiles(position, { lat: s.lat, lng: s.lng }) * 10) / 10,
+    }))
+  }, [stops, position])
 
   const handleFilterToggle = useCallback((filterId: string) => {
     setActiveFilters((prev) => {
@@ -60,9 +79,9 @@ export default function Home() {
 
   // Filter stations based on active filters
   const filteredStations = useMemo(() => {
-    if (activeFilters.size === 0) return stations
+    if (activeFilters.size === 0) return stopsWithDistance
 
-    return stations.filter((station) => {
+    return stopsWithDistance.filter((station) => {
       for (const filter of activeFilters) {
         switch (filter) {
           case "ccs":
@@ -184,10 +203,17 @@ export default function Home() {
           <>
             <MapPlaceholder
               stations={filteredStations}
-              selectedStationId={selectedStation?.id || null}
+              selectedStationId={selectedStation?.id ?? null}
               onSelectStation={handleStationSelect}
+              onBoundsChange={(b) => setBounds({ north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() })}
               className="h-full"
             />
+
+            {isStale && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 rounded-full bg-cc-caution-amber/10 border border-cc-caution-amber/30 px-3 py-1 text-xs text-cc-caution-amber">
+                ⚠️ Data may be outdated
+              </div>
+            )}
 
             {/* Floating indicators on map */}
             <div className="absolute left-4 top-3 z-10 flex items-center gap-1.5 rounded-full bg-card/90 px-2.5 py-1 shadow-sm backdrop-blur-sm">
