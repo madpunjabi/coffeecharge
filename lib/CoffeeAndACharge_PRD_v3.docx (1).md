@@ -72,7 +72,7 @@ Coffee & A Charge rates every charging stop on two independent dimensions, combi
 
 ## **4.2 The Combined C\&C Score**
 
-The two subscores are summed and displayed on a 10-point scale as the headline C\&C Score (Charge Confidence Score + Brew Score = C\&C Score) — giving enough granularity to feel meaningful, borrowing the consumer familiarity of hotel and restaurant rating systems. A perfect Charge Confidence Score of 5.0 and a perfect Brew Score of 5.0 equals a C\&C Score of 10.0.
+The two subscores are averaged and displayed on a 10-point scale as the headline C\&C Score — giving enough granularity to feel meaningful, borrowing the consumer familiarity of hotel and restaurant rating systems.
 
 | C\&C Score   8.8  / 10 EXCELLENT STOP |
 | :---: |
@@ -101,12 +101,12 @@ Tapping the Brew Score reveals:
 
 | Sub-component | Weight | Data Source |
 | :---- | :---- | :---- |
-| Food options within 5-min walk | 30% | Overture Maps (location/hours) \+ Geoapify (ratings enrichment) |
-| Restroom access | 20% | Overture Maps \+ community tags |
-| Retail / shopping nearby | 15% | Overture Maps |
-| Venue quality (ratings) | 15% | Geoapify rating data (OSM-based) |
-| Environment type (indoor/outdoor) | 10% | Overture Maps \+ community photos |
-| Hours coverage during charge window | 10% | Overture Maps hours data |
+| Food options within 5-min walk | 30% | Google Places API |
+| Restroom access | 20% | Google Places \+ community tags |
+| Retail / shopping nearby | 15% | Google Places API |
+| Venue quality (ratings) | 15% | Google Places rating data |
+| Environment type (indoor/outdoor) | 10% | Google Places \+ community photos |
+| Hours coverage during charge window | 10% | Google Places hours data |
 
 # **5\. Core Use Cases**
 
@@ -139,21 +139,21 @@ The Trip Planner lets users sequence charging stops for long drives, estimate ch
 
 ### **Smart Stop Search**
 
-* Range-constrained map view: set a range slider (miles) to define the search corridor around the user’s current location
+* Range-constrained map view: input current battery %, vehicle model, and destination to define the charging corridor
 
 * Brand-level amenity filter: search for specific chains (Starbucks, McDonald’s, Panera, Whole Foods, Target, Walmart)
 
 * Multi-filter combinations: Fast Charger (150kW+) \+ Starbucks \+ Restrooms \+ Open Now in a single search
 
-* Results ranked by composite C\&C Score when no destination is set; when a destination is entered, results are sorted by lowest detour distance first, then by C\&C Score as a tiebreaker
+* Results ranked by composite C\&C Score with route deviation penalty applied
 
 ### **Charge Confidence Score (Live)**
 
 * NEVI-compliant station real-time data via OCPI — federally mandated open data, available immediately
 
-* ChargePoint API integration for live stall availability (V1.1 — access pending; abstraction layer built at MVP so it slots in without a rewrite)
+* ChargePoint API integration for live stall availability
 
-* Community check-in system: one-tap “Check In” button on the stop detail sheet; immediately logs “working” status; toast confirmation + button state change to “Checked In ✓”. No form or multi-step flow.
+* Community check-in system: one-tap “Is this charger working?” on arrival
 
 * Reliability badge: Green (90%+ uptime), Amber (70–90%), Red (\<70% or recent failure reports)
 
@@ -161,11 +161,9 @@ The Trip Planner lets users sequence charging stops for long drives, estimate ch
 
 ### **Brew Score (Calculated)**
 
-* Overture Maps integration: pull brand POI locations (Starbucks, McDonald's, etc.) and hours within 400m of every station — free, no per-call cost
+* Google Places API integration: pull all amenities within 400m of every station
 
-* Geoapify Places API: ratings enrichment for Brew Score sub-components (3,000 free credits/day, ~90k calls/month — no credit card required)
-
-* Score calculated server-side via Next.js API route and cached weekly in InstantDB (not computed live — controls API costs)
+* Score calculated server-side and cached weekly (not computed live — controls API costs)
 
 * Walking distance from charger to each amenity shown explicitly, not just “nearby”
 
@@ -183,9 +181,13 @@ The Trip Planner lets users sequence charging stops for long drives, estimate ch
 
 * Fallback station always shown: “If this stop fails, your next option is X miles away”
 
-### **Vehicle Profile** *(moved from P0 — see P1)*
+### **Vehicle Profile**
 
-> **MVP decision:** Vehicle profile and energy modelling are deferred to P1. The MVP uses a simple range slider (miles) for corridor definition. Connector type filtering moves to P1 alongside the vehicle database.
+* Supports all major EV models with accurate range and charging curve data
+
+* Connector type auto-filters incompatible chargers from all results
+
+* Temperature and elevation adjustments to range estimate
 
 ## **P1 — Version 1.1**
 
@@ -233,18 +235,15 @@ The Trip Planner lets users sequence charging stops for long drives, estimate ch
 
 | Score | Data Source | Type | Cost | Priority |
 | :---- | :---- | :---- | :---- | :---- |
-| Charge Confidence | NREL Alternative Fuels API | Station registry (seed) | Free | Day 1 |
+| Charge Confidence | NREL Alternative Fuels API | Station registry | Free | Day 1 |
 | Charge Confidence | NEVI OCPI feeds (federal mandate) | Real-time status | Free | Day 1 |
-| Charge Confidence | Open Charge Map (OCM) | Station fallback registry | Free | Week 2–3 |
+| Charge Confidence | ChargePoint Developer API | Real-time availability | Free (gated) | Apply now |
+| Charge Confidence | Open Charge Map (OCM) | Station fallback registry | Free | Day 1 |
 | Charge Confidence | Community check-ins (proprietary) | Verification layer | Internal | Beta |
-| Charge Confidence | ChargePoint Developer API | Live stall-level availability | Free (gated) | V1.1 — apply now, abstraction layer built at MVP |
 | Charge Confidence | EVgo API | Real-time status | Partnership | V1.1 |
-| Brew Score | Overture Maps | Brand POI locations + hours (replaces Google Places) | Free | Day 1 |
-| Brew Score | Geoapify Places API | Ratings enrichment only (Overture handles locations + hours) | Free ≤3k credits/day (~90k/month) | Day 1 |
-| Brew Score | Google Places API | ~~Replaced by Overture Maps~~ | ~~Paid~~ | ~~Removed~~ |
-| Brew Score | Walk Score API | ~~Replaced by Overture + OSM~~ | ~~Licensed~~ | ~~Removed~~ |
-
-> **⚑ Engineering Week 1 verification task:** NEVI OCPI feeds may return per-stall EVSE status (`AVAILABLE`, `CHARGING`, `INOPERATIVE`) or station-level only, depending on network implementation. Verify on first live feed pull. If per-stall data is absent for major networks, elevate ChargePoint API to Day 1 priority.
+| Brew Score | Google Places API | Amenity discovery | Paid (cache) | Day 1 |
+| Brew Score | Foursquare Places API | Supplemental POI | Cheaper alt. | V1.1 |
+| Brew Score | Walk Score API | Walkability proxy | Licensed | MVP shortcut |
 
 ## **7.2 The NEVI Advantage**
 
@@ -264,54 +263,11 @@ Understanding this is important for competitive positioning. The fragmentation i
 
 This fragmentation is Coffee & A Charge’s moat. If real-time charger \+ amenity synthesis were easy, Google would have done it. The complexity is the barrier.
 
-## **7.4 Developer Resources & API Documentation**
-
-All APIs used in the stack, with links to documentation, sign-up pages, and access status. Engineering should obtain all keys before beginning Week 1.
-
-### Charger Data (Charge Confidence Score)
-
-| API | Purpose | Access | Docs | Sign-up / Key |
-| :---- | :---- | :---- | :---- | :---- |
-| **NREL Alternative Fuels Station API** | Full US charging station registry — seeds the InstantDB stops database on day one | Free, instant | [developer.nrel.gov/docs/transportation/alt-fuel-stations-v1](https://developer.nrel.gov/docs/transportation/alt-fuel-stations-v1/) | [developer.nrel.gov/signup](https://developer.nrel.gov/signup/) |
-| **NEVI OCPI Feeds** | Federally mandated real-time charger status for NEVI-funded stations | Free, open data | [OCPI 2.2 Protocol Spec](https://github.com/ocpi/ocpi) · [AFDC NEVI overview](https://afdc.energy.gov/programs/1212) | No key required — public endpoints |
-| **Open Charge Map API** | Station registry fallback; fills networks not covered by NREL | Free | [openchargemap.org/site/develop/api](https://openchargemap.org/site/develop/api) | [openchargemap.org/site/develop/api#register](https://openchargemap.org/site/develop/api) |
-| **ChargePoint Developer API** | Live per-stall availability — V1.1, pending access approval | Free (gated — apply now) | [chargepoint.com/developers](https://www.chargepoint.com/developers) | Apply at [na.chargepoint.com/chargepoint\_access](https://na.chargepoint.com/chargepoint_access) — approval takes weeks |
-
-### Amenity Data (Brew Score)
-
-| API | Purpose | Access | Docs | Sign-up / Key |
-| :---- | :---- | :---- | :---- | :---- |
-| **Overture Maps** | Brand POI locations + opening hours within 400m of each station (primary amenity source — replaces Google Places) | Free, no key required | [docs.overturemaps.org](https://docs.overturemaps.org/) · [Places guide](https://docs.overturemaps.org/guides/places/) | No key — data available on [AWS S3](https://docs.overturemaps.org/getting-data/) and [Azure Blob](https://docs.overturemaps.org/getting-data/) |
-| **Geoapify Places API** | Ratings enrichment only — OSM-based quality signals for Brew Score venue quality sub-component (15% weight) | Free ≤ 3,000 credits/day (~90k/month) | [apidocs.geoapify.com/docs/places](https://apidocs.geoapify.com/docs/places/) | [myprojects.geoapify.com](https://myprojects.geoapify.com/) — no credit card required |
-
-### Maps & Infrastructure
-
-| API | Purpose | Access | Docs | Sign-up / Key |
-| :---- | :---- | :---- | :---- | :---- |
-| **Mapbox GL JS** | Interactive map rendering — full-screen map with overlaid UI | Free ≤ 50,000 map loads/month | [docs.mapbox.com/mapbox-gl-js](https://docs.mapbox.com/mapbox-gl-js/guides/) | [account.mapbox.com](https://account.mapbox.com/) |
-| **InstantDB** | Client-side real-time database, auth, and permissions | Free tier | [instantdb.com/docs](https://www.instantdb.com/docs) | Already configured — `NEXT_PUBLIC_INSTANT_APP_ID` in `.env.local` |
-| **Vercel** | Hosting, serverless API routes, and Cron Jobs for weekly Brew Score refresh | Free tier (Cron once/day); Pro $20/month for hourly | [vercel.com/docs/cron-jobs](https://vercel.com/docs/cron-jobs) | [vercel.com](https://vercel.com/) — connect GitHub repo |
-
-### Key Status Summary for Engineering
-
-| API | Key In Hand? | Action Required |
-| :---- | :---- | :---- |
-| NREL | No | Sign up at developer.nrel.gov — instant approval |
-| Open Charge Map | No | Register at openchargemap.org — instant approval |
-| Overture Maps | No key needed | Download from S3/Azure directly |
-| Geoapify | No | Sign up at myprojects.geoapify.com — instant, no card |
-| Mapbox | No | Sign up at account.mapbox.com — instant approval |
-| ChargePoint | No | **Apply now** — gated approval, weeks-long wait |
-| InstantDB | ✅ Yes | Already in `.env.local` |
-| NEVI OCPI | No key needed | Public endpoints — no registration |
-
 # **8\. UI Direction**
-
-> **Design mocks:** `docs/designmocks.zip` — extract for full-fidelity screen designs covering the map view, filter bar, stop cards, stop detail screen, and score breakdowns. These mocks are the source of truth for implementation; the written specs below are supplementary.
 
 ## **8.1 Design Principles**
 
-* **Decisions in 2 taps.**  Results are visible immediately on app open (0 taps). The primary filter flow (tap a range pill → tap an amenity filter) adds at most 2 interactions before ranked results update. Non-negotiable.
+* **Decisions in 2 taps.**  The primary flow (set range → add amenity filter → see ranked results) must complete in no more than 2 user interactions from app launch. Non-negotiable.
 
 * **Calm confidence.**  EV travel is already anxiety-inducing. The design should feel settled and trustworthy — never busy or alarming.
 
@@ -335,14 +291,14 @@ All APIs used in the stack, with links to documentation, sign-up pages, and acce
 
 ### **Filter Bar**
 
-Horizontally scrolling brand pills at the top of the map screen. Text labels with icons (not brand logo images) for MVP — simpler to ship, accessible, and consistent across brand and non-brand filters alike. Brand logo images are a V1.1 polish upgrade. Examples:
+Horizontally scrolling brand pills at the top of the map screen. Brand logos (not text) for major chains — instantly recognizable at a glance. Examples:
 
 |   FILTER BAR EXAMPLE \[ ⚡ Fast 150kW+ \]  \[ Starbucks logo \]  \[ McDonald’s logo \]  \[ 🚹 Restrooms \]  \[ 📶 Wifi \]  \[ 🛒 Grocery \]  \[ 🏨 Hotel \] |
 | :---- |
 
 ### **Stop Card**
 
-Each card shows: charger network badge, reliability badge, station name, distance + detour label (“On route” or “+X mi detour”), C\&C Score (top-right), Charge Confidence Score (⚡ bolts out of 5 + decimal), Brew Score (☕ cups out of 5 + decimal), kW badge, stall availability (X/Y color-coded green/red), price/kWh, amenity pills, “Last verified” timestamp. The C\&C Score tier label (e.g. “Excellent”) is shown beneath the numeric score on the card.
+Each card shows: charger network logo, power level badge (e.g. “150 kW”), stall count / available stalls, Charge Confidence Score (⚡ bolts), top 3 amenities as brand logos with walking time, Brew Score (☕ cups), C\&C Score headline, detour distance from route.
 
 ### **Stop Detail Screen**
 
@@ -428,73 +384,38 @@ When native does happen, React Native with Expo is the recommended path given th
 | :---- | :---- | :---- |
 | Frontend | Next.js \+ TypeScript \+ Tailwind | Familiar stack; PWA-ready; mobile-first responsive design |
 | Maps | Mapbox GL JS | Cheaper than Google Maps JS; highly customizable; touch-optimized; generous free tier |
-| Database | InstantDB | Client-side real-time DB with built-in auth; replaces Supabase. Schema in `instant.schema.ts`, permissions in `instant.perms.ts` |
-| Backend functions | Next.js API Routes \+ Vercel Cron | Score calculation and weekly Brew Score refresh via API routes; OCPI polling via Vercel Cron. Upgrade to Vercel Pro ($20/mo) if sub-daily cron is needed |
+| Database | Supabase (Postgres) | Familiar from TimeBlock; real-time subscriptions; built-in auth |
+| Backend functions | Supabase Edge Functions | Score calculation, API polling, cron jobs — all in one place |
 | PWA layer | next-pwa | Service worker, offline caching, push notifications via Next.js |
-| Station registry | NREL API \+ Open Charge Map | Free; complete US coverage; seeds database on day one via one-time Next.js API route |
-| Amenity data | Overture Maps (primary) \+ Geoapify (ratings enrichment) | Overture: free brand POI locations + hours. Geoapify: OSM-based ratings enrichment, 3k free credits/day (~90k/month). Google Places and Foursquare removed. |
-| Live status | NEVI OCPI (MVP) \+ ChargePoint API (V1.1) | NEVI OCPI is free and federally mandated. ChargePoint access pending — abstraction layer (`ChargerStatusProvider`) built at MVP |
+| Station registry | NREL API \+ Open Charge Map | Free; complete US coverage; seeds database on day one |
+| Amenity data | Google Places API (cached) | Most complete dataset; cache weekly to control costs |
+| Live status | ChargePoint API \+ NEVI OCPI | Real-time availability; apply for ChargePoint access now |
 | Hosting | Vercel | Free tier; instant deployments; PWA-compatible; perfect for Next.js |
 
-## **9.7 Architecture Decisions**
-
-The following decisions were made during engineering readiness review (February 2026) and supersede any conflicting details elsewhere in this document.
-
-| Decision | Choice | Rationale |
-| :---- | :---- | :---- |
-| Geographic scope | Full US from day one | Overture Maps is free; no marginal cost for broader coverage |
-| Authentication | Soft gate — map visible immediately; Google OAuth prompted before full access | Map loads without auth; Google sign-in required for check-in and saving stops; uses InstantDB built-in OAuth |
-| Auth method | Google OAuth only (no magic link) | Single sign-in method reduces UI complexity; Google is fastest path on mobile |
-| Geospatial queries | Bounding box (InstantDB) \+ client-side radius filter | InstantDB has no native geo queries; `lat`/`lng` stored as indexed fields; viewport bounding box queried, exact radius filtered client-side |
-| ChargePoint API | Defer to V1.1; abstraction layer at MVP | Access not yet granted; `ChargerStatusProvider` interface ensures zero-rewrite integration when approved |
-| OCPI live polling | **Deferred to V1.1** | MVP Charge Score uses static network benchmarks (35% weight) \+ community check-ins (20% weight) \+ uptime proxy from NREL data. Live OCPI polling added in V1.1 alongside ChargePoint API |
-| Charge Score MVP data sources | Static network benchmarks \+ NREL seed data \+ community check-ins | Avoids need for any polling infrastructure at MVP. `ChargerStatusProvider` abstraction layer built so live OCPI slots in without rewrite |
-| Amenity data source | Overture Maps (DuckDB preprocessing) \+ Geoapify | Overture accessed via one-time local DuckDB script querying S3 — no bulk download, no Overture API needed. Geoapify for ratings enrichment only |
-| Overture Maps access pattern | DuckDB local preprocessing script | Run once locally: DuckDB queries Overture S3 directly, outputs filtered US POIs, imported into InstantDB as `amenities`. Re-run quarterly on new Overture release |
-| Vehicle profile | Deferred to P1 | Full energy model too complex for MVP; range slider used instead |
-| VehicleProfile UI | Removed from MVP `page.tsx` | "Set Vehicle" button replaced with "Sign In" button in header; `VehicleProfile` component deferred to P1 |
-| Score formula | Charge Confidence \+ Brew Score = C\&C Score | Sum, not average; both scores 0–5, sum is 0–10 |
-| Range slider | Single-handle radius from GPS (MVP) | Sets search radius from current location; route corridor deferred to P1 trip planner |
-| Result sort order | No destination: C\&C Score descending. With destination: detour distance ascending, then C\&C Score | Detour distance is the primary constraint on a road trip; score breaks ties |
-| Fallback station selection | Nearest by distance to the current stop | Simple, predictable; no threshold or score requirement |
-| Check-in interaction | One-tap: logs "working" instantly; toast + button state change | Minimises friction; no form or multi-step flow at MVP |
-| Score tier label on card | Shown on stop card below numeric score | e.g. "Excellent" below "8.4"; label also appears in detail sheet |
-| Loading / error states | Skeleton screens while loading; stale cached data with "⚠️ Data may be outdated" banner on failure | Never hide content entirely; maintain trust through transparency |
-| Promoted content | Deferred to P1 | All MVP results are organic; no sponsored placement |
-| Component library | Shadcn/ui \+ Radix UI; Drawer (vaul) for detail sheet | Selected in design mocks; consistent with existing `components.json` |
-| Typeface | Geist (sans), Geist Mono | Set in `@theme inline` in `globals.css` |
-| Dark mode | In scope for MVP | Full dark palette defined; see `docs/designmocks.zip` |
-| Vercel plan | **Free tier** | Weekly Vercel Cron sufficient for both NREL sync and Brew Score refresh. No sub-hourly OCPI polling needed at MVP. Vercel Pro not required |
-| Cron cadence | Weekly (Vercel free tier) | Two weekly cron jobs: NREL registry sync (Monday 3am UTC) \+ Brew Score refresh for top 500 active stations (Sunday 2am UTC) |
-| Implementation approach | UI-first (design mocks → data wiring) | Design mocks are production-ready components. Scaffold full UI with mock data in Phase 0 (Days 1–3), then wire real data phase-by-phase. App is visually complete and shareable from Week 1 |
-
-## **9.8 Implementation Roadmap**
+## **9.7 Implementation Roadmap**
 
 | Phase | Timeline | Goal | Key Deliverables |
 | :---- | :---- | :---- | :---- |
-| **Scaffold** | **Days 1–3** | **Full UI running on mock data** | Install deps; create `lib/types.ts`, `lib/utils.ts`, `lib/mock-data.ts`; copy all design mock components; update `globals.css`, `layout.tsx`, `page.tsx` (remove VehicleProfile, add Sign In button); verify app renders at localhost:3000 |
-| Foundation | Weeks 1–2 | Stations on a map (real data) | Design \+ push InstantDB schema (stops, stalls, amenities, checkIns, brewScores, chargeScores, savedStops); seed DB from NREL; replace MapPlaceholder with Mapbox GL JS; bounding box query hook; radius filter utility |
-| Brew Score | Weeks 3–4 | Every stop scored for amenities | DuckDB preprocessing script for Overture Maps S3; amenity seeding into InstantDB; Geoapify ratings enrichment; Brew Score calculation engine; API route; weekly Vercel Cron |
-| Charge Score | Weeks 5–6 | Every stop has a Charge Score | Static network benchmarks; Charge Score calculation engine (benchmarks \+ NREL data \+ check-in recency); `ChargerStatusProvider` abstraction; Google OAuth (InstantDB); auth gate component; one-tap check-in flow; C\&C Score assembly |
-| Core Search | Weeks 7–8 | Founding use case works end-to-end | Filter pills wired to real data; range slider; full bounding box \+ radius \+ sort pipeline; stop detail sheet fully wired; fallback station; score breakdown; NREL weekly sync cron |
-| PWA upgrade | Weeks 9–10 | Mobile-installable with GPS \+ offline | `next-pwa` config; PWA manifest; service worker caching (station data \+ Mapbox tiles \+ app shell); GPS geolocation hook; "Locate me" button |
-| Soft Launch | Weeks 11–12 | 100 real users, real check-in data | Vercel Analytics wired; skeleton loading screens; stale data banner; empty state UI; EV community seeding (Reddit r/electricvehicles, Facebook EV groups) |
+| Foundation | Weeks 1–2 | Stations on a map | Seed DB from NREL; Mapbox map rendering all US chargers; mobile-first layout |
+| Brew Score | Weeks 3–4 | Every stop scored for amenities | Google Places integration; Brew Score calculation; cached weekly |
+| Charge Score | Weeks 5–6 | Every stop has a Charge Score | NEVI OCPI \+ ChargePoint API; community check-in flow |
+| Core Search | Weeks 7–8 | Founding use case works end-to-end | Filter pills; range constraint; stop detail screen; full C\&C Score |
+| PWA upgrade | Weeks 9–10 | Mobile-installable with GPS \+ notifications | PWA manifest; service worker; GPS location; push notification setup |
+| Soft Launch | Weeks 11–12 | 100 real users, real check-in data | EV community seeding (Reddit, Facebook groups); analytics; iteration |
 
 ## **9.8 Budget Reality**
 
 Early-stage monthly infrastructure costs are lean and fully bootstrappable:
 
-* **Vercel:**  **Free tier only.** OCPI live polling deferred to V1.1 — no sub-hourly cron needed. Weekly Vercel Cron covers NREL sync and Brew Score refresh.
+* **Vercel:**  Free tier covers early stage comfortably. Scales gracefully.
 
-* **InstantDB:**  Free tier handles the load well into beta.
+* **Supabase:**  Free tier handles the load well into beta.
 
-* **Overture Maps:**  Free. DuckDB queries S3 directly (no download). Re-run locally each quarter on new Overture release.
-
-* **Geoapify Places API:**  Free up to 3,000 credits/day (~90,000 calls/month) — no credit card required. Used only for ratings enrichment; Overture Maps handles all location and hours data for free.
+* **Google Places API:**  The main variable cost. Budget $200–$300/month for development; aggressive caching cuts this significantly at scale.
 
 * **Mapbox:**  Free up to 50,000 map loads/month — more than enough for early traction.
 
-* **Total early stage:**  **~$0/month.** Fully bootstrappable through first 500 users. All API tiers remain free at MVP scale. Google Places costs eliminated.
+* **Total early stage:**  $300–$500/month. Well within bootstrapped territory through the first 500 users.
 
 # **10\. Competitive Positioning**
 
@@ -530,7 +451,7 @@ Coffee & A Charge is not a route energy calculator (ABRP) or a charger database 
 
 | Risk | Likelihood | Mitigation |
 | :---- | :---- | :---- |
-| Geoapify rating data completeness | Low | OSM-based ratings are less rich than Foursquare/Google but sufficient for MVP; weekly caching keeps call volume well within the 3k/day free tier |
+| Google Places API cost at scale | High | Cache Brew Scores weekly server-side; evaluate Foursquare as cheaper alternative early |
 | Charging network API access gating | Medium | Lead with NEVI/NREL (free, open); apply for ChargePoint now; use community check-ins as fallback |
 | Stale data eroding trust | High | 'Last verified' timestamps everywhere; community check-in incentive program from day one |
 | ABRP or PlugShare adds brand filters | Low-Medium | Move fast; consumer positioning and UX are differentiated even if features are matched |
@@ -548,6 +469,6 @@ Coffee & A Charge is not a route energy calculator (ABRP) or a charger database 
 | Net Promoter Score | Post-trip survey NPS | \> 50 |
 | Community Check-ins | Total check-ins submitted by users | 5,000 in first 90 days |
 
-Coffee & A Charge  ·  Confidential  ·  v1.3  ·  February 2026
+Coffee & A Charge  ·  Confidential  ·  v1.0  ·  February 2026
 
 *The stop that works for your car and for you.*
