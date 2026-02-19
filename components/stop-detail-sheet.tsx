@@ -10,6 +10,7 @@ import { AmenityList } from "./amenity-list"
 import { ScoreBreakdown } from "./score-breakdown"
 import { FallbackStation } from "./fallback-station"
 import { AuthGate } from "./auth/auth-gate"
+import { db } from "@/lib/db"
 import {
   Drawer,
   DrawerContent,
@@ -39,6 +40,13 @@ const networkLabels: Record<string, string> = {
 export function StopDetailSheet({ station, isOpen, onClose }: StopDetailSheetProps) {
   const { checkIn, checkedInStopIds, pendingStopId } = useCheckIn()
   const { requireAuth, showGate, setShowGate } = useAuthGate()
+
+  const { data: fallbackData } = db.useQuery(
+    station?.fallbackStationId
+      ? { stops: { $: { where: { id: station.fallbackStationId } } } }
+      : null
+  )
+  const fallbackStation = (fallbackData?.stops?.[0] ?? null) as Station | null
 
   if (!station) return null
 
@@ -166,7 +174,7 @@ export function StopDetailSheet({ station, isOpen, onClose }: StopDetailSheetPro
             </div>
 
             {/* Fallback station */}
-            <FallbackStation fallbackStation={null} />
+            <FallbackStation fallbackStation={fallbackStation} />
 
             {/* Action buttons */}
             <div className="flex gap-2 pt-2">

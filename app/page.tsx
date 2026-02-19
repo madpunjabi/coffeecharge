@@ -16,9 +16,11 @@ import { StopCard } from "@/components/stop-card"
 import { StopDetailSheet } from "@/components/stop-detail-sheet"
 import { SearchBar } from "@/components/search-bar"
 import { AuthGate } from "@/components/auth/auth-gate"
+import { RangeSlider } from "@/components/search/range-slider"
 import { Zap, Coffee, SlidersHorizontal, ChevronUp, ChevronDown, List, Map as MapIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthGate } from "@/hooks/use-auth-gate"
+import { filterByRadius } from "@/lib/geo/radius-filter"
 
 type ViewMode = "map" | "list"
 type PanelState = "collapsed" | "peek" | "expanded"
@@ -31,10 +33,11 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>("map")
   const [panelState, setPanelState] = useState<PanelState>("peek")
   const [bounds, setBounds] = useState<BoundingBox | null>(null)
+  const [radiusMiles, setRadiusMiles] = useState(50)
   const listRef = useRef<HTMLDivElement>(null)
 
   const { position } = useGeolocation()
-  const { stops, isLoading, isStale } = useStationQuery(bounds)
+  const { stops, isLoading, isStale } = useStationQuery(bounds, activeFilters)
   const { user, showGate, setShowGate } = useAuthGate()
 
   const stopsWithDistance = useMemo(() => {
@@ -84,25 +87,22 @@ export default function Home() {
     })
   }, [])
 
-  // Filter stations based on active filters
+  // Filter stations — indexed filters (ccs/nacs/chademo/fast/available) handled by DB query
+  // Client-side: radius, ultrafast power, and brand/amenity filters
   const filteredStations = useMemo(() => {
-    if (activeFilters.size === 0) return stopsWithDistance
+    let result = stopsWithDistance
 
-    return stopsWithDistance.filter((station) => {
+    // Radius filter from GPS position
+    if (position && radiusMiles) {
+      result = filterByRadius(result, position, radiusMiles)
+    }
+
+    // Client-side only filters
+    if (activeFilters.size === 0) return result
+
+    return result.filter((station) => {
       for (const filter of activeFilters) {
         switch (filter) {
-          case "ccs":
-            if (!station.connectorTypes.includes("CCS")) return false
-            break
-          case "chademo":
-            if (!station.connectorTypes.includes("CHAdeMO")) return false
-            break
-          case "nacs":
-            if (!station.connectorTypes.includes("NACS")) return false
-            break
-          case "fast":
-            if (station.maxPowerKw < 150) return false
-            break
           case "ultrafast":
             if (station.maxPowerKw < 250) return false
             break
@@ -118,16 +118,13 @@ export default function Home() {
           case "grocery":
             if (!station.amenities.some((a) => a.category === "grocery")) return false
             break
-          case "available":
-            if (!station.stalls.some((s) => s.status === "available")) return false
-            break
           default:
             break
         }
       }
       return true
     })
-  }, [activeFilters, stopsWithDistance])
+  }, [activeFilters, stopsWithDistance, position, radiusMiles])
 
   const sortedStations = useMemo(
     () => [...filteredStations].sort((a, b) => b.ccScore - a.ccScore),
@@ -171,6 +168,9 @@ export default function Home() {
 
         {/* Filter pills */}
         <FilterBar activeFilters={activeFilters} onToggle={handleFilterToggle} />
+
+        {/* Range slider */}
+        <RangeSlider value={radiusMiles} onChange={setRadiusMiles} />
       </header>
 
       {/* View mode toggle - floating */}

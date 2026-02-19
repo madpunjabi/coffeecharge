@@ -2,27 +2,27 @@
 import { db } from "@/lib/db"
 import type { BoundingBox, Station } from "@/lib/types"
 
-export function useStationQuery(bounds: BoundingBox | null) {
-  const { data, isLoading, error } = db.useQuery(
-    bounds
-      ? {
-          stops: {
-            $: {
-              where: {
-                and: [
-                  { lat: { $gte: bounds.south } },
-                  { lat: { $lte: bounds.north } },
-                  { lng: { $gte: bounds.west } },
-                  { lng: { $lte: bounds.east } },
-                  { isActive: true },
-                ],
-              },
-            },
-            amenities: {},
-          },
-        }
-      : null
-  )
+export function useStationQuery(bounds: BoundingBox | null, activeFilters?: Set<string>) {
+  const filters = activeFilters ?? new Set<string>()
+
+  // Build indexed where clauses to push to DB
+  const baseWhere = bounds ? [
+    { lat: { $gte: bounds.south } },
+    { lat: { $lte: bounds.north } },
+    { lng: { $gte: bounds.west } },
+    { lng: { $lte: bounds.east } },
+    { isActive: true },
+    ...(filters.has("ccs")       ? [{ hasCcs: true }]   : []),
+    ...(filters.has("nacs")      ? [{ hasNacs: true }]  : []),
+    ...(filters.has("chademo")   ? [{ hasChademo: true }] : []),
+    ...(filters.has("fast")      ? [{ maxPowerKw: { $gte: 150 } }] : []),
+    ...(filters.has("available") ? [{ availableStalls: { $gte: 1 } }] : []),
+  ] : null
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const query = baseWhere ? { stops: { $: { where: { and: baseWhere as any } }, amenities: {} } } : null
+
+  const { data, isLoading, error } = db.useQuery(query)
 
   // Map InstantDB stops to Station type
   const stops = (data?.stops ?? []).map(s => ({
