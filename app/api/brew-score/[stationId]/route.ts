@@ -5,7 +5,7 @@ import schema from "@/instant.schema"
 import { fetchGeoapifyRatings } from "@/lib/scoring/geoapify"
 import { calculateBrewScore } from "@/lib/scoring/brew-score"
 
-const adminDB = init({ appId: process.env.NEXT_PUBLIC_INSTANT_APP_ID!, adminToken: process.env.INSTANT_ADMIN_TOKEN!, schema })
+const adminDB = init({ appId: process.env.INSTANT_APP_ID!, adminToken: process.env.INSTANT_ADMIN_TOKEN!, schema })
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ stationId: string }> }) {
   const authHeader = req.headers.get("authorization")

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { init, id } from "@instantdb/admin"
 import schema from "@/instant.schema"
 
-const adminDB = init({ appId: process.env.NEXT_PUBLIC_INSTANT_APP_ID!, adminToken: process.env.INSTANT_ADMIN_TOKEN!, schema })
+const adminDB = init({ appId: process.env.INSTANT_APP_ID!, adminToken: process.env.INSTANT_ADMIN_TOKEN!, schema })
 
 const NREL_BASE = "https://developer.nrel.gov/api/alt-fuel-stations/v1.json"
 const PAGE_SIZE = 200

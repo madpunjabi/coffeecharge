@@ -9,17 +9,14 @@ interface GeolocationState {
 }
 
 export function useGeolocation(): GeolocationState {
-  const [state, setState] = useState<GeolocationState>({
-    position: null,
-    error: null,
-    isLoading: true,
+  const [state, setState] = useState<GeolocationState>(() => {
+    // Lazy initializer avoids a synchronous setState on mount when unsupported
+    const supported = typeof navigator !== "undefined" && !!navigator.geolocation
+    return { position: null, error: supported ? null : "Geolocation not supported", isLoading: supported }
   })
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setState({ position: null, error: "Geolocation not supported", isLoading: false })
-      return
-    }
+    if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(
       (pos) => setState({
         position: { lat: pos.coords.latitude, lng: pos.coords.longitude },

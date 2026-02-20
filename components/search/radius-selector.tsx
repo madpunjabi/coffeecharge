@@ -8,7 +8,7 @@ interface Props {
   onChange: (miles: number) => void
 }
 
-export function RangeSlider({ value, onChange }: Props) {
+export function RadiusSelector({ value, onChange }: Props) {
   return (
     <div className="flex items-center gap-2 px-4 py-2">
       <span className="text-xs text-muted-foreground shrink-0">Range</span>

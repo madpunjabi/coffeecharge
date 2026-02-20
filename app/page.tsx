@@ -16,7 +16,8 @@ import { StopCard } from "@/components/stop-card"
 import { StopDetailSheet } from "@/components/stop-detail-sheet"
 import { SearchBar } from "@/components/search-bar"
 import { AuthGate } from "@/components/auth/auth-gate"
-import { RangeSlider } from "@/components/search/range-slider"
+import { RadiusSelector } from "@/components/search/radius-selector"
+import { MapErrorBoundary } from "@/components/map/map-error-boundary"
 import { Zap, Coffee, SlidersHorizontal, ChevronUp, ChevronDown, List, Map as MapIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthGate } from "@/hooks/use-auth-gate"
@@ -170,7 +171,7 @@ export default function Home() {
         <FilterBar activeFilters={activeFilters} onToggle={handleFilterToggle} />
 
         {/* Range slider */}
-        <RangeSlider value={radiusMiles} onChange={setRadiusMiles} />
+        <RadiusSelector value={radiusMiles} onChange={setRadiusMiles} />
       </header>
 
       {/* View mode toggle - floating */}
@@ -179,7 +180,7 @@ export default function Home() {
           type="button"
           onClick={() => setViewMode("map")}
           className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-xl border shadow-md transition-all active:scale-95",
+            "flex h-11 w-11 items-center justify-center rounded-xl border shadow-md transition-all active:scale-95",
             viewMode === "map"
               ? "border-cc-charge-blue bg-cc-charge-blue text-white"
               : "border-border bg-card text-muted-foreground hover:bg-muted"
@@ -192,7 +193,7 @@ export default function Home() {
           type="button"
           onClick={() => setViewMode("list")}
           className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-xl border shadow-md transition-all active:scale-95",
+            "flex h-11 w-11 items-center justify-center rounded-xl border shadow-md transition-all active:scale-95",
             viewMode === "list"
               ? "border-cc-charge-blue bg-cc-charge-blue text-white"
               : "border-border bg-card text-muted-foreground hover:bg-muted"
@@ -208,13 +209,15 @@ export default function Home() {
         {/* MAP VIEW */}
         {viewMode === "map" && (
           <>
-            <MapPlaceholder
-              stations={filteredStations}
-              selectedStationId={selectedStation?.id ?? null}
-              onSelectStation={handleStationSelect}
-              onBoundsChange={handleBoundsChange}
-              className="h-full"
-            />
+            <MapErrorBoundary>
+              <MapPlaceholder
+                stations={filteredStations}
+                selectedStationId={selectedStation?.id ?? null}
+                onSelectStation={handleStationSelect}
+                onBoundsChange={handleBoundsChange}
+                className="h-full"
+              />
+            </MapErrorBoundary>
 
             {isStale && (
               <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 rounded-full bg-cc-caution-amber/10 border border-cc-caution-amber/30 px-3 py-1 text-xs text-cc-caution-amber">

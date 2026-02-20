@@ -115,6 +115,16 @@ async function main() {
   const stops = result.stops
   console.log(`✅ Found ${stops.length} stops`)
 
+  // Pre-fetch all existing amenities once to avoid N+1 queries in the loop
+  console.log("🔍 Pre-fetching existing amenities for idempotency check…")
+  const existingResult = await db.query({ amenities: {} })
+  const existingByStopId = new Map<string, Set<string>>()
+  for (const a of existingResult.amenities ?? []) {
+    const s = a as { stopId: string; overtureId: string }
+    if (!existingByStopId.has(s.stopId)) existingByStopId.set(s.stopId, new Set())
+    existingByStopId.get(s.stopId)!.add(s.overtureId)
+  }
+
   const database = new duckdb.Database(":memory:")
   console.log(`\n📦 Opening parquet: ${PARQUET_PATH}`)
 
@@ -135,13 +145,8 @@ async function main() {
       continue
     }
 
-    // Idempotency: skip POIs already seeded for this stop
-    const existing = await db.query({
-      amenities: { $: { where: { stopId: stop.id } } },
-    })
-    const existingOvertureIds = new Set(
-      (existing.amenities ?? []).map((a: { overtureId: string }) => a.overtureId)
-    )
+    // Idempotency: skip POIs already seeded for this stop (uses pre-fetched map)
+    const existingOvertureIds = existingByStopId.get(stop.id) ?? new Set<string>()
     const toInsert = nearby.filter(poi => !existingOvertureIds.has(poi.id))
 
     if (toInsert.length === 0) {

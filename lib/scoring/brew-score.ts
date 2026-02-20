@@ -61,9 +61,14 @@ export function calculateBrewScore(amenities: AmenityInput[]): BrewScore {
   }
 }
 
+/**
+ * Heuristic: returns true if the place is likely open during a typical charge window (8 am–8 pm).
+ * Known approximation: any hours string containing ":" counts as open. This intentionally
+ * over-scores rather than under-scores — missing hours data is treated as open to avoid
+ * penalising the majority of POIs that Overture doesn't have hours for.
+ * A full OSM hours parser (e.g. opening_hours.js) can replace this at V1.1.
+ */
 function isLikelyOpenDuringChargeWindow(hoursJson: string | null): boolean {
   if (!hoursJson) return true  // assume open when no data (avoids penalizing data gaps)
-  // Parse OSM hours format: "Mo-Fr 08:00-22:00; Sa 09:00-21:00"
-  // Simple check: contains any hours with opening < 12:00 and closing > 12:00
   return hoursJson.includes(":") && !hoursJson.toLowerCase().includes("closed")
 }

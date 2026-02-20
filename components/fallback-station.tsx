@@ -1,11 +1,15 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import type { Station } from "@/lib/types"
 import { AlertTriangle, Navigation } from "lucide-react"
 
+interface FallbackStationMin {
+  name: string
+  city: string
+}
+
 interface FallbackStationProps {
-  fallbackStation: Station | null
+  fallbackStation: FallbackStationMin | null
   className?: string
 }
 

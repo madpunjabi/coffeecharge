@@ -46,7 +46,10 @@ export function StopDetailSheet({ station, isOpen, onClose }: StopDetailSheetPro
       ? { stops: { $: { where: { id: station.fallbackStationId } } } }
       : null
   )
-  const fallbackStation = (fallbackData?.stops?.[0] ?? null) as Station | null
+  const fallbackRaw = fallbackData?.stops?.[0] ?? null
+  const fallbackStation = fallbackRaw
+    ? { name: String(fallbackRaw.name ?? ""), city: String(fallbackRaw.city ?? "") }
+    : null
 
   if (!station) return null
 
