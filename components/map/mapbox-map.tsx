@@ -41,6 +41,11 @@ export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoun
       zoom: 4,
     })
 
+    // Zoom +/− buttons (top-right), no compass
+    map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right")
+    // Prevent accidental rotation on two-finger pinch — keep zoom only
+    map.current.touchZoomRotate.disableRotation()
+
     map.current.on("load", () => {
       // Add GeoJSON source
       map.current!.addSource("stations", {
