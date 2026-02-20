@@ -166,7 +166,12 @@ export default function Home() {
 
         {/* Search bar */}
         <div className="px-4 pb-2 pt-1">
-          <SearchBar />
+          <SearchBar
+            onSelectLocation={(lat, lng) => {
+              flyToRef.current?.(lat, lng)
+              setViewMode("map")
+            }}
+          />
         </div>
 
         {/* Filter pills */}
