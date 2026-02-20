@@ -23,7 +23,7 @@ const PAGE_SIZE = 200
 // States already seeded — skip them. Update this list as states complete.
 const ALREADY_SEEDED = new Set([
   "CA", "TX", "FL", "NY", "CO", "WA", "NV", "OR", "AZ", // Phase 4 seeds
-  "AL", "AK", "AR",  // completed in Phase 6 seeding run
+  "AL", "AK", "AR", "CT", "DE", "GA",  // Phase 6 run 1
 ])
 
 const ALL_STATES = [
