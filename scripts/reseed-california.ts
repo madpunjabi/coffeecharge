@@ -111,7 +111,12 @@ async function main() {
     const stations = data.fuel_stations ?? []
     if (stations.length === 0) break
 
-    const txns = stations.map((s) => {
+    let skipped = 0
+    const txns = stations.flatMap((s) => {
+      // Skip non-networked stations (dealerships, workplace chargers, etc.)
+      const network = normalizeNetwork(s.ev_network as string | null)
+      if (network === "Unknown") { skipped++; return [] }
+
       const nrelId = String(s.id)
       const existingId = existingMap.get(nrelId)
       const stopId = existingId ?? id()
@@ -121,7 +126,7 @@ async function main() {
       const dcFastCount = Number(s.ev_dc_fast_num ?? 0)
       const l2Count = Number(s.ev_level2_evse_num ?? 0)
 
-      return db.tx.stops[stopId].update({
+      return [db.tx.stops[stopId].update({
         nrelId,
         name: String(s.station_name),
         address: String(s.street_address),
@@ -152,7 +157,7 @@ async function main() {
         photoCount: 0,
         lastVerifiedAt: Date.now(),
         isActive: s.status_code === "E",
-      })
+      })]
     })
 
     for (let i = 0; i < txns.length; i += BATCH_SIZE) {
@@ -161,13 +166,13 @@ async function main() {
     }
 
     processed += stations.length
-    console.log(`  ${processed}/${total} (${updated} updated, ${created} new)`)
+    console.log(`  ${processed}/${total} (${updated} updated, ${created} new, ${skipped} skipped)`)
 
     offset += PAGE_SIZE
     if (offset < total) await sleep(PAGE_DELAY)
   }
 
-  console.log(`\n✅ Done! ${processed} CA stations: ${updated} updated, ${created} new.`)
+  console.log(`\n✅ Done! ${processed} CA stations from NREL: ${updated} updated, ${created} new, ${processed - updated - created} skipped (non-networked).`)
 }
 
 main().catch(err => { console.error(err); process.exit(1) })
