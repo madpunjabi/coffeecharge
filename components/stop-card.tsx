@@ -18,11 +18,19 @@ interface StopCardProps {
 }
 
 const networkColors: Record<string, string> = {
-  "Tesla Supercharger": "bg-cc-alert-red/10 text-cc-alert-red",
-  "Electrify America": "bg-cc-charge-blue/10 text-cc-charge-blue",
-  "ChargePoint": "bg-cc-brew-green/10 text-cc-brew-green",
-  "EVgo": "bg-cc-caution-amber/10 text-cc-caution-amber",
-  "Blink": "bg-cc-warm-brown/10 text-cc-warm-brown",
+  "Tesla Supercharger": "bg-cc-alert-red text-white",
+  "Electrify America": "bg-cc-charge-blue text-white",
+  "ChargePoint": "bg-cc-brew-green text-white",
+  "EVgo": "bg-cc-caution-amber text-white",
+  "Blink": "bg-cc-warm-brown text-white",
+}
+
+const networkLabels: Record<string, string> = {
+  "Tesla Supercharger": "Tesla",
+  "Electrify America": "EA",
+  "ChargePoint": "ChargePoint",
+  "EVgo": "EVgo",
+  "Blink": "Blink",
 }
 
 export function StopCard({ station, isSelected = false, onSelect, compact = false, className }: StopCardProps) {
@@ -46,7 +54,7 @@ export function StopCard({ station, isSelected = false, onSelect, compact = fals
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <span className={cn("shrink-0 rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-wider", networkColors[station.network] || "bg-muted text-muted-foreground")}>
-                {station.network.split(" ")[0]}
+                {networkLabels[station.network] ?? station.network.split(" ")[0]}
               </span>
               <ReliabilityBadge level={station.reliability} />
             </div>
@@ -102,7 +110,7 @@ export function StopCard({ station, isSelected = false, onSelect, compact = fals
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className={cn("shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider", networkColors[station.network] || "bg-muted text-muted-foreground")}>
-              {station.network.split(" ")[0]}
+              {networkLabels[station.network] ?? station.network.split(" ")[0]}
             </span>
             <ReliabilityBadge level={station.reliability} />
           </div>

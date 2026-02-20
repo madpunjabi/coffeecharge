@@ -109,10 +109,13 @@ export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoun
         source: "stations",
         filter: ["!", ["has", "point_count"]],
         paint: {
-          "circle-color": ["case",
-            ["==", ["get", "reliability"], "high"], "#2E7D32",
-            ["==", ["get", "reliability"], "medium"], "#E65100",
-            "#C62828"
+          "circle-color": ["match", ["get", "network"],
+            "Tesla Supercharger", "#C62828",
+            "Electrify America",  "#1565C0",
+            "ChargePoint",        "#2E7D32",
+            "EVgo",               "#E65100",
+            "Blink",              "#00ADEF",
+            "#6B7280"
           ],
           "circle-radius": 8,
           "circle-stroke-width": 2,
@@ -174,7 +177,7 @@ export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoun
       features: stations.map(s => ({
         type: "Feature",
         geometry: { type: "Point", coordinates: [s.lng, s.lat] },
-        properties: { stationId: s.id, ccScore: s.ccScore, reliability: s.reliability },
+        properties: { stationId: s.id, ccScore: s.ccScore, reliability: s.reliability, network: s.network },
       })),
     })
   }, [stations])
