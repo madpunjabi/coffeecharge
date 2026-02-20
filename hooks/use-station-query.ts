@@ -42,7 +42,7 @@ export function useStationQuery(bounds: BoundingBox | null, activeFilters?: Set<
     maxPowerKw: s.maxPowerKw,
     stalls: JSON.parse(s.stallsJson ?? "[]"),
     pricePerKwh: s.pricePerKwh ?? 0,
-    ccScore: s.ccScore ?? 0,
+    ccScore: s.ccScore ?? 7,
     chargeScore: { overall: 0, ...JSON.parse(s.chargeScoreJson ?? "{}") },
     brewScore: { overall: 0, ...JSON.parse(s.brewScoreJson ?? "{}") },
     reliability: s.reliabilityLevel as Station["reliability"],
