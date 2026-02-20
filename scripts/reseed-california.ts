@@ -25,9 +25,9 @@ const db = init({
 
 const NREL_BASE = "https://developer.nrel.gov/api/alt-fuel-stations/v1.json"
 const PAGE_SIZE = 200
-const BATCH_SIZE = 25
-const BATCH_DELAY = 800
-const PAGE_DELAY = 2000
+const BATCH_SIZE = 10   // smaller batches = less likely to timeout
+const BATCH_DELAY = 1200
+const PAGE_DELAY = 3000
 
 function normalizeNetwork(raw: string | null | undefined): string {
   const n = (raw ?? "").toLowerCase()
@@ -42,16 +42,17 @@ function normalizeNetwork(raw: string | null | undefined): string {
 async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)) }
 
 async function transactWithRetry(batch: object[]) {
-  for (let attempt = 1; attempt <= 5; attempt++) {
+  for (let attempt = 1; attempt <= 8; attempt++) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await db.transact(batch as any)
       return
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      if (attempt === 5) throw new Error(`Batch failed after 5 attempts: ${msg}`)
-      console.warn(`    retry ${attempt}/5: ${msg}`)
-      await sleep(2000 * attempt)
+      if (attempt === 8) throw new Error(`Batch failed after 8 attempts: ${msg}`)
+      const wait = 3000 * attempt
+      console.warn(`    retry ${attempt}/8 (wait ${wait}ms): ${msg}`)
+      await sleep(wait)
     }
   }
 }
@@ -84,22 +85,29 @@ async function loadExistingCaStops(): Promise<Map<string, string>> {
 }
 
 async function main() {
+  // Support resuming: npx tsx scripts/reseed-california.ts --offset 4800
+  const offsetArg = process.argv.find(a => a.startsWith("--offset=") || a === "--offset")
+  const startOffset = offsetArg
+    ? parseInt(offsetArg.startsWith("--offset=") ? offsetArg.split("=")[1] : process.argv[process.argv.indexOf("--offset") + 1])
+    : 0
+  if (startOffset > 0) console.log(`Resuming from offset ${startOffset}\n`)
+
   // Step 1: load existing CA stops into memory (one query, no per-page lookups)
   const existingMap = await loadExistingCaStops()
 
   // Step 2: fetch NREL total
   console.log("Fetching CA stations from NREL…")
-  const firstPage = await fetchNrelPage(0)
+  const firstPage = await fetchNrelPage(startOffset)
   const total = firstPage.total_results
   console.log(`  ${total} CA stations in NREL\n`)
 
-  let offset = 0
+  let offset = startOffset
   let processed = 0
   let updated = 0
   let created = 0
 
   while (offset < total) {
-    const data = offset === 0 ? firstPage : await fetchNrelPage(offset)
+    const data = offset === startOffset ? firstPage : await fetchNrelPage(offset)
     const stations = data.fuel_stations ?? []
     if (stations.length === 0) break
 
