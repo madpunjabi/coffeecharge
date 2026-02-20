@@ -7,11 +7,8 @@ export const filterOptions: FilterOption[] = [
   { id: "ccs", label: "CCS", category: "connector" },
   { id: "chademo", label: "CHAdeMO", category: "connector" },
   { id: "starbucks", label: "Starbucks", category: "brand" },
-  { id: "mcdonalds", label: "McDonald's", category: "brand" },
   { id: "target", label: "Target", category: "brand" },
-  { id: "grocery", label: "Grocery", category: "amenity" },
   { id: "restrooms", label: "Restrooms", category: "amenity" },
-  { id: "wifi", label: "WiFi", category: "amenity" },
   { id: "available", label: "Available Now", category: "availability" },
 ]
 

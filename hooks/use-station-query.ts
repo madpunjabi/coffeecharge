@@ -20,7 +20,7 @@ export function useStationQuery(bounds: BoundingBox | null, activeFilters?: Set<
   ] : null
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const query = baseWhere ? { stops: { $: { where: { and: baseWhere as any }, limit: 100, order: { ccScore: "desc" as const } }, amenities: {} } } : null
+  const query = baseWhere ? { stops: { $: { where: { and: baseWhere as any }, limit: 100, order: { maxPowerKw: "desc" as const } }, amenities: {} } } : null
 
   const { data, isLoading, error } = db.useQuery(query)
 

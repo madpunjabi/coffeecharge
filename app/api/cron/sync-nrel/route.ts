@@ -7,6 +7,17 @@ import schema from "@/instant.schema"
 
 const adminDB = init({ appId: process.env.INSTANT_APP_ID!, adminToken: process.env.INSTANT_ADMIN_TOKEN!, schema })
 
+function normalizeNetwork(raw: string | null | undefined): string {
+  const n = (raw ?? "").toLowerCase()
+  if (n.includes("tesla") && n.includes("supercharger")) return "Tesla Supercharger"
+  if (n.includes("tesla")) return "Tesla Supercharger"
+  if (n.includes("electrify america")) return "Electrify America"
+  if (n.includes("chargepoint")) return "ChargePoint"
+  if (n.includes("evgo")) return "EVgo"
+  if (n.includes("blink")) return "Blink"
+  return "Unknown"
+}
+
 const NREL_BASE = "https://developer.nrel.gov/api/alt-fuel-stations/v1.json"
 const PAGE_SIZE = 200
 
@@ -62,7 +73,7 @@ export async function GET(req: NextRequest) {
       zip: String(s.zip),
       lat: Number(s.latitude),
       lng: Number(s.longitude),
-      network: String(s.ev_network ?? "Unknown"),
+      network: normalizeNetwork(s.ev_network as string | null),
       maxPowerKw: Number(s.ev_dc_fast_num ?? 0) > 0 ? 150 : 7,
       connectorTypesJson: JSON.stringify(connectors),
       hasCcs: connectors.includes("J1772COMBO"),

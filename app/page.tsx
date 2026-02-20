@@ -153,14 +153,8 @@ export default function Home() {
           case "starbucks":
             if (!station.amenities.some((a) => a.brand.toLowerCase().includes("starbucks"))) return false
             break
-          case "mcdonalds":
-            if (!station.amenities.some((a) => a.brand.toLowerCase().includes("mcdonald"))) return false
-            break
           case "target":
             if (!station.amenities.some((a) => a.brand.toLowerCase().includes("target"))) return false
-            break
-          case "grocery":
-            if (!station.amenities.some((a) => a.category === "grocery")) return false
             break
           default:
             break
