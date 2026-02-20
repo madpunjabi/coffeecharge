@@ -8,6 +8,9 @@ export const filterOptions: FilterOption[] = [
   { id: "chademo", label: "CHAdeMO", category: "connector" },
   { id: "starbucks", label: "Starbucks", category: "brand" },
   { id: "target", label: "Target", category: "brand" },
+  { id: "tesla", label: "Tesla", category: "network" },
+  { id: "electrify-america", label: "Electrify America", category: "network" },
+  { id: "evgo", label: "EVgo", category: "network" },
   { id: "restrooms", label: "Restrooms", category: "amenity" },
   { id: "available", label: "Available Now", category: "availability" },
 ]

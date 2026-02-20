@@ -87,7 +87,7 @@ export interface Station {
 export interface FilterOption {
   id: string
   label: string
-  category: "connector" | "power" | "brand" | "amenity" | "availability"
+  category: "connector" | "power" | "brand" | "amenity" | "availability" | "network"
 }
 
 export interface ScoreTier {
