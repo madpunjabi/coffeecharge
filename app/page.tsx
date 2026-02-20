@@ -173,12 +173,15 @@ export default function Home() {
   const sortedStations = useMemo(() => {
     if (routeGeometry) {
       const coords = routeGeometry.coordinates as [number, number][]
-      return [...filteredStations].sort((a, b) => {
-        const distA = minDistanceToPolyline({ lat: a.lat, lng: a.lng }, coords)
-        const distB = minDistanceToPolyline({ lat: b.lat, lng: b.lng }, coords)
-        if (Math.abs(distA - distB) > 0.1) return distA - distB
-        return b.ccScore - a.ccScore
-      })
+      return filteredStations
+        .map(s => ({
+          ...s,
+          detourMiles: Math.round(minDistanceToPolyline({ lat: s.lat, lng: s.lng }, coords) * 10) / 10,
+        }))
+        .sort((a, b) => {
+          if (Math.abs(a.detourMiles - b.detourMiles) > 0.1) return a.detourMiles - b.detourMiles
+          return b.ccScore - a.ccScore
+        })
     }
     return [...filteredStations].sort((a, b) => b.ccScore - a.ccScore)
   }, [filteredStations, routeGeometry])
