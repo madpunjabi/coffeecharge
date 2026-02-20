@@ -12,12 +12,15 @@ interface Props {
   selectedStationId: string | null
   onSelectStation: (station: Station) => void
   onBoundsChange?: (bounds: mapboxgl.LngLatBounds) => void
+  userPosition?: { lat: number; lng: number } | null
+  flyToRef?: React.MutableRefObject<((lat: number, lng: number) => void) | null>
   className?: string
 }
 
-export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoundsChange, className }: Props) {
+export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoundsChange, userPosition, flyToRef, className }: Props) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
+  const userMarkerRef = useRef<mapboxgl.Marker | null>(null)
   const stationsRef = useRef(stations)
   const onSelectRef = useRef(onSelectStation)
   const onBoundsRef = useRef(onBoundsChange)
@@ -111,6 +114,30 @@ export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoun
 
     return () => { map.current?.remove(); map.current = null }
   }, [])
+
+  // Expose flyTo function via ref so parent can trigger centering
+  useLayoutEffect(() => {
+    if (!flyToRef) return
+    flyToRef.current = (lat: number, lng: number) => {
+      map.current?.flyTo({ center: [lng, lat], zoom: 11, duration: 800 })
+    }
+    return () => { if (flyToRef) flyToRef.current = null }
+  }, [flyToRef])
+
+  // Update user location dot when position changes
+  useEffect(() => {
+    if (!map.current || !userPosition) return
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setLngLat([userPosition.lng, userPosition.lat])
+    } else {
+      const el = document.createElement("div")
+      el.style.cssText =
+        "width:16px;height:16px;background:#1565C0;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3)"
+      userMarkerRef.current = new mapboxgl.Marker(el)
+        .setLngLat([userPosition.lng, userPosition.lat])
+        .addTo(map.current)
+    }
+  }, [userPosition])
 
   // Update GeoJSON when stations change
   useEffect(() => {

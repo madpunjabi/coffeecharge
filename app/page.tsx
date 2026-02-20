@@ -18,7 +18,7 @@ import { SearchBar } from "@/components/search-bar"
 import { AuthGate } from "@/components/auth/auth-gate"
 import { RadiusSelector } from "@/components/search/radius-selector"
 import { MapErrorBoundary } from "@/components/map/map-error-boundary"
-import { Zap, Coffee, SlidersHorizontal, ChevronUp, ChevronDown, List, Map as MapIcon } from "lucide-react"
+import { Zap, Coffee, SlidersHorizontal, ChevronUp, ChevronDown, List, Map as MapIcon, Navigation } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthGate } from "@/hooks/use-auth-gate"
 import { filterByRadius } from "@/lib/geo/radius-filter"
@@ -36,6 +36,7 @@ export default function Home() {
   const [bounds, setBounds] = useState<BoundingBox | null>(null)
   const [radiusMiles, setRadiusMiles] = useState(50)
   const listRef = useRef<HTMLDivElement>(null)
+  const flyToRef = useRef<((lat: number, lng: number) => void) | null>(null)
 
   const { position } = useGeolocation()
   const { stops, isLoading, isStale } = useStationQuery(bounds, activeFilters)
@@ -174,7 +175,7 @@ export default function Home() {
         <RadiusSelector value={radiusMiles} onChange={setRadiusMiles} />
       </header>
 
-      {/* View mode toggle - floating */}
+      {/* View mode toggle + locate-me - floating */}
       <div className="absolute right-4 top-[140px] z-20 flex flex-col gap-1.5">
         <button
           type="button"
@@ -202,6 +203,16 @@ export default function Home() {
         >
           <List className="h-4 w-4" />
         </button>
+        {position && (
+          <button
+            type="button"
+            onClick={() => flyToRef.current?.(position.lat, position.lng)}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-card text-cc-charge-blue shadow-md transition-all hover:bg-muted active:scale-95"
+            aria-label="Center on my location"
+          >
+            <Navigation className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Content area */}
@@ -215,6 +226,8 @@ export default function Home() {
                 selectedStationId={selectedStation?.id ?? null}
                 onSelectStation={handleStationSelect}
                 onBoundsChange={handleBoundsChange}
+                userPosition={position}
+                flyToRef={flyToRef}
                 className="h-full"
               />
             </MapErrorBoundary>
