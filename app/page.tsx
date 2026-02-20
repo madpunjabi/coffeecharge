@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useCallback, useMemo, useRef } from "react"
+import { useState, useCallback, useMemo, useRef, useEffect } from "react"
 import type { Station, BoundingBox } from "@/lib/types"
+import type GeoJSON from "geojson"
 import dynamic from "next/dynamic"
 import { useStationQuery } from "@/hooks/use-station-query"
 import { useGeolocation } from "@/hooks/use-geolocation"
 import { haversineDistanceMiles } from "@/lib/geo/distance"
+import { minDistanceToPolyline, routeBoundingBox } from "@/lib/geo/route-corridor"
 
 const MapPlaceholder = dynamic(
   () => import("@/components/map/mapbox-map").then(m => ({ default: m.MapboxMap })),
@@ -14,7 +16,7 @@ const MapPlaceholder = dynamic(
 import { FilterBar } from "@/components/filter-bar"
 import { StopCard } from "@/components/stop-card"
 import { StopDetailSheet } from "@/components/stop-detail-sheet"
-import { SearchBar } from "@/components/search-bar"
+import { RouteSearch } from "@/components/search/route-search"
 import { AuthGate } from "@/components/auth/auth-gate"
 import { RadiusSelector } from "@/components/search/radius-selector"
 import { MapErrorBoundary } from "@/components/map/map-error-boundary"
@@ -26,6 +28,7 @@ import { filterByRadius } from "@/lib/geo/radius-filter"
 
 type ViewMode = "map" | "list"
 type PanelState = "collapsed" | "peek" | "expanded"
+interface LocationValue { label: string; lat: number; lng: number }
 
 export default function Home() {
   const [selectedStation, setSelectedStation] = useState<Station | null>(null)
@@ -36,12 +39,46 @@ export default function Home() {
   const [panelState, setPanelState] = useState<PanelState>("peek")
   const [bounds, setBounds] = useState<BoundingBox | null>(null)
   const [radiusMiles, setRadiusMiles] = useState(50)
+  const [origin, setOrigin] = useState<LocationValue | null>(null)
+  const [destination, setDestination] = useState<LocationValue | null>(null)
+  const [routeGeometry, setRouteGeometry] = useState<GeoJSON.LineString | null>(null)
+  const [routeBounds, setRouteBounds] = useState<BoundingBox | null>(null)
+  const [corridorMiles, setCorridorMiles] = useState(10)
+  const [routeError, setRouteError] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
   const flyToRef = useRef<((lat: number, lng: number) => void) | null>(null)
 
   const { position } = useGeolocation()
-  const { stops, isLoading, isStale } = useStationQuery(bounds, activeFilters)
+  const queryBounds = routeBounds ?? bounds
+  const { stops, isLoading, isStale } = useStationQuery(queryBounds, activeFilters)
   const { user, showGate, setShowGate } = useAuthGate()
+
+  // Fetch route geometry when both origin and destination are set
+  useEffect(() => {
+    if (!origin || !destination) {
+      setRouteGeometry(null)
+      setRouteBounds(null)
+      return
+    }
+    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?geometries=geojson&access_token=${token}`
+    setRouteError(false)
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        const geometry = data.routes?.[0]?.geometry as GeoJSON.LineString | undefined
+        if (!geometry) { setRouteError(true); return }
+        setRouteGeometry(geometry)
+      })
+      .catch(() => setRouteError(true))
+  }, [origin, destination])
+
+  // Derive route bounding box for InstantDB query when routeGeometry or corridorMiles changes
+  useEffect(() => {
+    if (!routeGeometry) { setRouteBounds(null); return }
+    const coords = routeGeometry.coordinates as [number, number][]
+    setRouteBounds(routeBoundingBox(coords, corridorMiles))
+  }, [routeGeometry, corridorMiles])
 
   const stopsWithDistance = useMemo(() => {
     if (!position) return stops
@@ -91,12 +128,16 @@ export default function Home() {
   }, [])
 
   // Filter stations — indexed filters (ccs/nacs/chademo/fast/available) handled by DB query
-  // Client-side: radius, ultrafast power, and brand/amenity filters
+  // Client-side: corridor or radius, ultrafast power, and brand/amenity filters
   const filteredStations = useMemo(() => {
     let result = stopsWithDistance
 
-    // Radius filter from GPS position
-    if (position && radiusMiles) {
+    if (routeGeometry) {
+      // Route corridor mode: filter by distance to polyline
+      const coords = routeGeometry.coordinates as [number, number][]
+      result = result.filter(s => minDistanceToPolyline({ lat: s.lat, lng: s.lng }, coords) <= corridorMiles)
+    } else if (position && radiusMiles) {
+      // GPS radius mode
       result = filterByRadius(result, position, radiusMiles)
     }
 
@@ -127,12 +168,20 @@ export default function Home() {
       }
       return true
     })
-  }, [activeFilters, stopsWithDistance, position, radiusMiles])
+  }, [activeFilters, stopsWithDistance, position, radiusMiles, routeGeometry, corridorMiles])
 
-  const sortedStations = useMemo(
-    () => [...filteredStations].sort((a, b) => b.ccScore - a.ccScore),
-    [filteredStations]
-  )
+  const sortedStations = useMemo(() => {
+    if (routeGeometry) {
+      const coords = routeGeometry.coordinates as [number, number][]
+      return [...filteredStations].sort((a, b) => {
+        const distA = minDistanceToPolyline({ lat: a.lat, lng: a.lng }, coords)
+        const distB = minDistanceToPolyline({ lat: b.lat, lng: b.lng }, coords)
+        if (Math.abs(distA - distB) > 0.1) return distA - distB
+        return b.ccScore - a.ccScore
+      })
+    }
+    return [...filteredStations].sort((a, b) => b.ccScore - a.ccScore)
+  }, [filteredStations, routeGeometry])
 
   return (
     <main className="relative flex h-dvh flex-col overflow-hidden bg-background">
@@ -164,21 +213,25 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Search bar */}
+        {/* Route search */}
         <div className="px-4 pb-2 pt-1">
-          <SearchBar
-            onSelectLocation={(lat, lng) => {
-              flyToRef.current?.(lat, lng)
+          <RouteSearch
+            userPosition={position}
+            onRouteChange={(orig, dest) => {
+              setOrigin(orig)
+              setDestination(dest)
               setViewMode("map")
             }}
+            corridorMiles={corridorMiles}
+            onCorridorChange={setCorridorMiles}
           />
         </div>
 
         {/* Filter pills */}
         <FilterBar activeFilters={activeFilters} onToggle={handleFilterToggle} />
 
-        {/* Range slider */}
-        <RadiusSelector value={radiusMiles} onChange={setRadiusMiles} />
+        {/* Range slider — only shown in GPS radius mode (no route set) */}
+        {!routeGeometry && <RadiusSelector value={radiusMiles} onChange={setRadiusMiles} />}
       </header>
 
       {/* View mode toggle + locate-me - floating */}
@@ -234,6 +287,7 @@ export default function Home() {
                 onBoundsChange={handleBoundsChange}
                 userPosition={position}
                 flyToRef={flyToRef}
+                routeGeometry={routeGeometry}
                 className="h-full"
               />
             </MapErrorBoundary>
@@ -241,6 +295,12 @@ export default function Home() {
             {isStale && (
               <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 rounded-full bg-cc-caution-amber/10 border border-cc-caution-amber/30 px-3 py-1 text-xs text-cc-caution-amber">
                 ⚠️ Data may be outdated
+              </div>
+            )}
+
+            {routeError && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 rounded-full bg-cc-caution-amber/10 border border-cc-caution-amber/30 px-3 py-1 text-xs text-cc-caution-amber">
+                Couldn&apos;t load route — showing stops near destination
               </div>
             )}
 
