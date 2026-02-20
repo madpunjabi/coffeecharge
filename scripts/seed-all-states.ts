@@ -20,8 +20,11 @@ const db = init({
 const NREL_BASE = "https://developer.nrel.gov/api/alt-fuel-stations/v1.json"
 const PAGE_SIZE = 200
 
-// States already seeded — skip them
-const ALREADY_SEEDED = new Set(["CA", "TX", "FL", "NY", "CO", "WA", "NV", "OR", "AZ", "AL", "AK", "AR"])
+// States already seeded — skip them. Update this list as states complete.
+const ALREADY_SEEDED = new Set([
+  "CA", "TX", "FL", "NY", "CO", "WA", "NV", "OR", "AZ", // Phase 4 seeds
+  "AL", "AK", "AR",  // completed in Phase 6 seeding run
+])
 
 const ALL_STATES = [
   "AL","AK","AR","CT","DE","GA","HI","ID","IL","IN",
@@ -123,12 +126,19 @@ async function main() {
   console.log(`Seeding ${states.length} states: ${states.join(" ")}`)
 
   let grandTotal = 0
+  const failed: string[] = []
   for (const state of states) {
     process.stdout.write(`\n── ${state} ──\n`)
-    const inserted = await seedState(state)
-    grandTotal += inserted
-    console.log(`\n  ✓ ${state}: ${inserted} stations`)
+    try {
+      const inserted = await seedState(state)
+      grandTotal += inserted
+      console.log(`\n  ✓ ${state}: ${inserted} stations`)
+    } catch (err) {
+      console.error(`\n  ✗ ${state}: failed — ${err}`)
+      failed.push(state)
+    }
   }
+  if (failed.length) console.log(`\nFailed states (re-add to ALREADY_SEEDED for others and rerun): ${failed.join(" ")}`)
 
   console.log(`\n✅ Done! ${grandTotal} total stations seeded.`)
 }
