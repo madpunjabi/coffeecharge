@@ -27,30 +27,34 @@ npx instant-cli pull --yes          # Pull schema + perms from prod
 
 The founding use case: *"I need to charge within the next 50 miles and my passenger wants a Starbucks — show me the best stop in under 30 seconds."*
 
-## Current State
+## Current State (as of Phase 4)
 
-This is a **bare scaffold** — `app/page.tsx` and `app/layout.tsx` are still the default Next.js templates. No app-specific code has been written yet. The following must be created/installed before feature work:
+Phases 0–4 are complete. The app is a working MVP shell with real data wiring. All dependencies are installed, the schema is fully defined and pushed, and the main UI is implemented.
 
-- Create `lib/db.ts` — InstantDB client singleton
-- Add domain entities to `instant.schema.ts` (currently only has `$files`, `$streams`, `$users`)
-- Install missing dependencies (full list in the implementation plan):
-  ```bash
-  npm install vaul mapbox-gl next-themes @vercel/analytics lucide-react class-variance-authority clsx tailwind-merge tw-animate-css
-  npm install --save-dev @types/mapbox-gl
-  ```
-- Install shadcn/ui components using **new-york** style (CSS variables, lucide icons)
-- Populate `app/globals.css` with brand color tokens — use `docs/designmocks_extracted/app/globals.css` as the exact source
-- Update `app/layout.tsx` metadata (title is still "Create Next App")
+**What's built:**
+- Full main page (`app/page.tsx`) — map + bottom sheet layout, filter bar, range slider, list/map toggle, auth gate
+- Complete component library: `stop-card`, `stop-detail-sheet`, `filter-bar`, all score components, `mapbox-map`, `auth-gate`, `range-slider`, etc.
+- `lib/types.ts` — all domain types (`Station`, `Amenity`, `ChargeScore`, `BrewScore`, `Stall`, `BoundingBox`, etc.)
+- `lib/mock-data.ts` — mock stations for offline/dev use
+- `lib/scoring/` — `charge-score.ts`, `brew-score.ts`, `network-benchmarks.ts`, `geoapify.ts`
+- `lib/charger-status/` — `provider.ts` (interface), `mock-provider.ts`
+- `lib/geo/` — `distance.ts` (haversine), `radius-filter.ts`, `bounding-box.ts`
+- `hooks/` — `use-station-query.ts`, `use-auth-gate.ts`, `use-check-in.ts`, `use-geolocation.ts`
+- `instant.schema.ts` — full schema: `stops`, `amenities`, `checkIns`, `savedStops`
+- `instant.perms.ts` — permissions defined (public read on stops/amenities; auth required for check-ins/saved stops)
+- API routes: `POST /api/brew-score/[stationId]`, `GET /api/cron/refresh-brew-scores`, `GET /api/cron/sync-nrel`, `POST /api/seed-stations`
+- Vercel cron: brew-score refresh Sundays 2am UTC, NREL sync Mondays 3am UTC
 
-**Implementation plan:** `docs/plans/2026-02-19-coffee-and-a-charge-mvp.md` — use `superpowers:executing-plans` to work through it task-by-task.
+**What's still needed (P1+):**
+- Live OCPI status polling (currently mocked with stall ratio proxy)
+- Overture Maps DuckDB ingestion script (`scripts/overture-to-amenities.ts` is scaffolded; `scripts/overture-extract.sh` is drafted)
+- Route corridor support (P1 trip planner — currently GPS radius only)
+- Promoted content (deferred to P1)
+- PWA service worker / offline caching
 
-**Reference components:** `docs/designmocks_extracted/` contains production-ready reference implementations for all major components. Copy and adapt from here rather than building from scratch:
-- `components/stop-card.tsx` — the main stop list card
-- `components/stop-detail-sheet.tsx` — vaul drawer for stop detail
-- `components/filter-bar.tsx` — horizontal scrolling brand filter pills
-- `components/charge-score.tsx`, `brew-score.tsx`, `score-badge.tsx`, `score-breakdown.tsx`
-- `components/reliability-badge.tsx`, `fallback-station.tsx`, `amenity-list.tsx`, `charger-grid.tsx`
-- `components/ui/` — shadcn/ui components pre-configured for this design system
+**Implementation plan:** `docs/plans/2026-02-19-coffee-and-a-charge-mvp.md` — use `superpowers:executing-plans` to work through remaining tasks.
+
+**Reference components:** `docs/designmocks_extracted/` is the source-of-truth for UI. If a component needs to be modified or rebuilt, check here first.
 
 ## Architecture
 
@@ -59,8 +63,8 @@ This is a **bare scaffold** — `app/page.tsx` and `app/layout.tsx` are still th
 **Key files:**
 - `lib/db.ts` — InstantDB client singleton to create (`import { db } from "@/lib/db"`)
 - `lib/utils.ts` — `cn()` utility (clsx + tailwind-merge); every component imports this
-- `instant.schema.ts` — Data model. Edit here then push with CLI. Domain entities (stops, amenities, check-ins, etc.) must be added before feature work.
-- `instant.perms.ts` — Row-level permissions. Edit here then push with CLI. Currently empty.
+- `instant.schema.ts` — Data model. Edit here then push with CLI. Full schema is implemented.
+- `instant.perms.ts` — Row-level permissions. Edit here then push with CLI. Permissions are defined.
 - `app/` — Next.js App Router pages and layouts
 - `app/globals.css` — Tailwind v4 uses CSS-first config (`@import "tailwindcss"` + `@import "tw-animate-css"`); there is no `tailwind.config.js`. Also needs `@custom-variant dark (&:is(.dark *))` for shadcn dark mode.
 - `components.json` — shadcn/ui config (new-york style, CSS variables, lucide icons, aliases: `@/components`, `@/lib/utils`, `@/components/ui`, `@/hooks`)
@@ -68,25 +72,43 @@ This is a **bare scaffold** — `app/page.tsx` and `app/layout.tsx` are still th
 - `docs/designmocks_extracted/` — Reference implementation (components + styles). **Source of truth for UI.**
 - `docs/plans/2026-02-19-coffee-and-a-charge-mvp.md` — Phased implementation plan.
 
-**Planned directory structure (once built):**
+**Actual directory structure:**
 ```
 app/
-  page.tsx          # Map + bottom sheet layout
-  layout.tsx        # Root layout with ThemeProvider
-  globals.css       # Brand tokens + Tailwind v4
+  page.tsx              # Map + bottom sheet layout (fully implemented)
+  layout.tsx            # Root layout with ThemeProvider + Vercel Analytics
+  globals.css           # Brand tokens + Tailwind v4
   api/
-    brew-score/     # Weekly cron + on-demand compute
+    brew-score/[stationId]/route.ts   # On-demand brew-score compute
+    cron/refresh-brew-scores/route.ts # Weekly cron (Sunday 2am UTC)
+    cron/sync-nrel/route.ts           # Weekly NREL sync (Monday 3am UTC)
+    seed-stations/route.ts            # Dev seed endpoint
 components/
-  ui/               # shadcn/ui primitives
-  stop-card.tsx
-  stop-detail-sheet.tsx
-  filter-bar.tsx
-  ... (see docs/designmocks_extracted/components/)
+  ui/                   # shadcn/ui primitives (new-york style)
+  map/                  # mapbox-map.tsx, map-placeholder-stub.tsx
+  auth/                 # auth-gate.tsx
+  search/               # range-slider.tsx
+  stop-card.tsx, stop-detail-sheet.tsx, filter-bar.tsx
+  charge-score.tsx, brew-score.tsx, score-badge.tsx, score-breakdown.tsx
+  reliability-badge.tsx, fallback-station.tsx, amenity-list.tsx, charger-grid.tsx
+  search-bar.tsx, theme-provider.tsx
 lib/
-  db.ts             # InstantDB singleton
-  utils.ts          # cn() utility
-hooks/              # Custom React hooks
-scripts/            # DuckDB Overture Maps import, NREL seeding
+  db.ts                 # InstantDB singleton (init with schema)
+  utils.ts              # cn() utility
+  types.ts              # All domain types + getScoreTier()
+  mock-data.ts          # Mock stations + filterOptions for dev
+  scoring/              # charge-score.ts, brew-score.ts, network-benchmarks.ts, geoapify.ts
+  charger-status/       # provider.ts (interface), mock-provider.ts
+  geo/                  # distance.ts (haversine), radius-filter.ts, bounding-box.ts
+hooks/
+  use-station-query.ts  # InstantDB query + Station type mapping
+  use-auth-gate.ts      # Auth state + gate visibility
+  use-check-in.ts       # One-tap check-in write
+  use-geolocation.ts    # GPS position
+scripts/
+  overture-extract.sh       # DuckDB S3 → parquet extract (drafted)
+  overture-to-amenities.ts  # Parquet → InstantDB import (scaffolded)
+  output/                   # Script output files
 ```
 
 **Environment variables** (in `.env.local`, gitignored):
@@ -165,6 +187,24 @@ These decisions were finalized during the design review and **override** the ori
 - **Loading states:** Skeleton screens while data loads. On data failure, show last cached values with a "⚠️ Data may be outdated" banner — never hide content entirely.
 - **Promoted content:** Deferred to P1. All MVP results are organic only.
 - **Empty state (no filter results):** Icon + "No stops match your filters" + "Clear all filters" link.
+
+## Data Flow
+
+**Station query pipeline** (`app/page.tsx` → `hooks/use-station-query.ts` → InstantDB):
+1. `useGeolocation` provides GPS `position`
+2. `MapboxMap` emits `onBoundsChange` → `BoundingBox` state in page
+3. `useStationQuery(bounds, activeFilters)` builds an InstantDB `where` clause using indexed fields (lat/lng range, `isActive`, `hasCcs`, `hasNacs`, `hasChademo`, `maxPowerKw`, `availableStalls`) and fetches `stops { amenities {} }`
+4. Result is mapped from InstantDB shape → `Station[]` type (JSON fields parsed, relative time formatted)
+5. Page applies client-side filters: radius (`filterByRadius` using haversine), ultra-fast power (250kW+), and brand/amenity filters
+6. Sorted by `ccScore` descending
+
+**Filter split — DB vs client-side:**
+- **DB-pushed (indexed):** connector type (ccs/nacs/chademo), fast (150kW+), available now, bounding box
+- **Client-side only:** ultrafast (250kW+), brand pills (Starbucks/McDonald's/Target), grocery/amenity category, radius from GPS
+
+**Cron jobs** (`vercel.json` → `app/api/cron/`):
+- `sync-nrel` — weekly NREL API pull → upserts stops in InstantDB; computes charge scores
+- `refresh-brew-scores` — weekly Overture + Geoapify computation → updates `brewScore` + `brewScoreComputedAt` per stop
 
 ## InstantDB Usage Patterns
 
