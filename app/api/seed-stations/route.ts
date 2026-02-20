@@ -9,7 +9,7 @@ const adminDB = init({ appId: process.env.INSTANT_APP_ID!, adminToken: process.e
 const NREL_BASE = "https://developer.nrel.gov/api/alt-fuel-stations/v1.json"
 const PAGE_SIZE = 200
 
-export const maxDuration = 300  // Vercel Pro: 5 minutes. Free: 10s — use state param to seed by state
+export const maxDuration = 10  // Vercel free tier max — one state+page per call stays well within this
 
 export async function POST(req: NextRequest) {
   const seedSecret = req.headers.get("x-seed-secret")
