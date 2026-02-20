@@ -18,6 +18,7 @@ import { SearchBar } from "@/components/search-bar"
 import { AuthGate } from "@/components/auth/auth-gate"
 import { RadiusSelector } from "@/components/search/radius-selector"
 import { MapErrorBoundary } from "@/components/map/map-error-boundary"
+import { StopCardSkeleton } from "@/components/stop-card-skeleton"
 import { Zap, Coffee, SlidersHorizontal, ChevronUp, ChevronDown, List, Map as MapIcon, Navigation } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthGate } from "@/hooks/use-auth-gate"
@@ -294,7 +295,9 @@ export default function Home() {
                   style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
                 >
                   {isLoading && [1, 2, 3].map(i => (
-                    <div key={i} className="h-[160px] w-[280px] shrink-0 rounded-xl bg-muted animate-pulse" />
+                    <div key={i} className="w-[280px] shrink-0">
+                      <StopCardSkeleton />
+                    </div>
                   ))}
                   {!isLoading && sortedStations.map((station) => (
                     <div key={station.id} className="w-[280px] shrink-0">
@@ -326,7 +329,8 @@ export default function Home() {
               {panelState === "expanded" && (
                 <div className="flex-1 overflow-y-auto px-4 pb-4 pt-1">
                   <div className="flex flex-col gap-3">
-                    {sortedStations.map((station) => (
+                    {isLoading && [1, 2, 3].map(i => <StopCardSkeleton key={i} />)}
+                    {!isLoading && sortedStations.map((station) => (
                       <StopCard
                         key={station.id}
                         station={station}
@@ -334,7 +338,7 @@ export default function Home() {
                         onSelect={handleCardTap}
                       />
                     ))}
-                    {sortedStations.length === 0 && (
+                    {!isLoading && sortedStations.length === 0 && (
                       <div className="flex flex-col items-center justify-center py-8 text-center">
                         <SlidersHorizontal className="mb-2 h-8 w-8 text-muted-foreground/40" aria-hidden="true" />
                         <p className="text-sm font-medium text-muted-foreground">No stops match your filters</p>
