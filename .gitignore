@@ -43,3 +43,6 @@ next-env.d.ts
 
 # scripts output (large parquet files — run overture-extract.sh locally)
 scripts/output/
+
+# git worktrees
+.worktrees/
