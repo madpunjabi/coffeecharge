@@ -2,6 +2,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react"
 import mapboxgl from "mapbox-gl"
 import "mapbox-gl/dist/mapbox-gl.css"
+import type GeoJSON from "geojson"
 import type { Station } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -14,10 +15,11 @@ interface Props {
   onBoundsChange?: (bounds: mapboxgl.LngLatBounds) => void
   userPosition?: { lat: number; lng: number } | null
   flyToRef?: React.MutableRefObject<((lat: number, lng: number) => void) | null>
+  routeGeometry?: GeoJSON.LineString | null
   className?: string
 }
 
-export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoundsChange, userPosition, flyToRef, className }: Props) {
+export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoundsChange, userPosition, flyToRef, routeGeometry, className }: Props) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null)
@@ -75,6 +77,25 @@ export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoun
         },
         paint: { "text-color": "#ffffff" },
       })
+
+      // Route line source (empty initially)
+      map.current!.addSource("route", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      })
+
+      // Route line layer — drawn below station pins
+      map.current!.addLayer({
+        id: "route-line",
+        type: "line",
+        source: "route",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: {
+          "line-color": "#1565C0",
+          "line-width": 4,
+          "line-opacity": 0.7,
+        },
+      }, "clusters") // insert below cluster/station layers so pins appear on top
 
       // Individual station pins
       map.current!.addLayer({
@@ -152,6 +173,24 @@ export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoun
       })),
     })
   }, [stations])
+
+  // Update route line when routeGeometry changes
+  useEffect(() => {
+    const source = map.current?.getSource("route") as mapboxgl.GeoJSONSource | undefined
+    if (!source) return
+    if (routeGeometry) {
+      source.setData({ type: "Feature", geometry: routeGeometry, properties: {} })
+      // Fit map to route bounds
+      const coords = routeGeometry.coordinates as [number, number][]
+      const bounds = coords.reduce(
+        (b, c) => b.extend(c as [number, number]),
+        new mapboxgl.LngLatBounds(coords[0], coords[0])
+      )
+      map.current?.fitBounds(bounds, { padding: 60, duration: 800 })
+    } else {
+      source.setData({ type: "FeatureCollection", features: [] })
+    }
+  }, [routeGeometry])
 
   return <div ref={mapContainer} className={cn("w-full h-full", className)} />
 }
