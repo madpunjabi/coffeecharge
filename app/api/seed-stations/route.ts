@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const res = await fetch(url.toString())
   const data = await res.json()
-  const stations = data.alt_fuel_stations ?? []
+  const stations = data.fuel_stations ?? []
 
   const transactions = stations.map((s: Record<string, unknown>) => {
     const connectors = (s.ev_connector_types as string[] | null) ?? []

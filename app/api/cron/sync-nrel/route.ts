@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
   const res = await fetch(url.toString())
   const data = await res.json()
-  const stations = data.alt_fuel_stations ?? []
+  const stations = data.fuel_stations ?? []
 
   // For each station: find existing by nrelId or create new
   const existingResult = await adminDB.query({
