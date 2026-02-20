@@ -157,13 +157,13 @@ export default function Home() {
             if (!station.amenities.some((a) => a.brand.toLowerCase().includes("target"))) return false
             break
           case "tesla":
-            if (!station.network.toLowerCase().includes("tesla")) return false
+            if (station.network !== "Tesla Supercharger") return false
             break
           case "electrify-america":
-            if (!station.network.toLowerCase().includes("electrify america")) return false
+            if (station.network !== "Electrify America") return false
             break
           case "evgo":
-            if (!station.network.toLowerCase().includes("evgo")) return false
+            if (station.network !== "EVgo") return false
             break
           default:
             break

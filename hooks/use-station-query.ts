@@ -6,6 +6,8 @@ export function useStationQuery(bounds: BoundingBox | null, activeFilters?: Set<
   const filters = activeFilters ?? new Set<string>()
 
   // Build indexed where clauses to push to DB
+  // Network filters (tesla, electrify-america, evgo) are client-side only —
+  // no indexed network field in the DB schema. Handled in page.tsx filteredStations.
   const baseWhere = bounds ? [
     { lat: { $gte: bounds.south } },
     { lat: { $lte: bounds.north } },
