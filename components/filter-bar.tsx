@@ -35,6 +35,10 @@ function FilterIcon({ filter }: { filter: FilterOption }) {
       return <ShoppingBag className={iconClass} />
     case "available":
       return <CheckCircle2 className={iconClass} />
+    case "tesla":
+    case "electrify-america":
+    case "evgo":
+      return <Zap className={iconClass} />
     default:
       return null
   }
