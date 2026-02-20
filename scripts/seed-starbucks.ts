@@ -38,13 +38,6 @@ interface Stop {
   lng: number
 }
 
-// ── InstantDB admin client ───────────────────────────────────────────────────
-const db = init({
-  appId: process.env.NEXT_PUBLIC_INSTANT_APP_ID!,
-  adminToken: process.env.INSTANT_ADMIN_TOKEN!,
-  schema,
-})
-
 // ── Spatial helpers ──────────────────────────────────────────────────────────
 function gridKey(lat: number, lng: number): string {
   return `${Math.floor(lat / GRID_CELL_DEG)},${Math.floor(lng / GRID_CELL_DEG)}`
@@ -109,7 +102,7 @@ async function fetchStarbucks(): Promise<OverpassNode[]> {
   }
 }
 
-async function fetchStops(): Promise<Stop[]> {
+async function fetchStops(db: ReturnType<typeof init<typeof schema>>): Promise<Stop[]> {
   const result = await db.query({ stops: {} })
   return (result.stops ?? []).map((s) => ({
     id: s.id,
@@ -118,7 +111,9 @@ async function fetchStops(): Promise<Stop[]> {
   }))
 }
 
-async function fetchExistingStarbucksStopIds(): Promise<Set<string>> {
+async function fetchExistingStarbucksStopIds(
+  db: ReturnType<typeof init<typeof schema>>
+): Promise<Set<string>> {
   const result = await db.query({ amenities: {} })
   const seeded = new Set<string>()
   for (const a of result.amenities ?? []) {
@@ -132,19 +127,26 @@ async function fetchExistingStarbucksStopIds(): Promise<Set<string>> {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  // Fix 4: Env-var guard
+  // Env-var guard
   if (!process.env.NEXT_PUBLIC_INSTANT_APP_ID || !process.env.INSTANT_ADMIN_TOKEN) {
     console.error("Missing NEXT_PUBLIC_INSTANT_APP_ID or INSTANT_ADMIN_TOKEN in .env.local")
     process.exit(1)
   }
 
+  // InstantDB admin client — initialized after the env-var guard
+  const db = init({
+    appId: process.env.NEXT_PUBLIC_INSTANT_APP_ID,
+    adminToken: process.env.INSTANT_ADMIN_TOKEN,
+    schema,
+  })
+
   console.log("Fetching Starbucks locations + stops in parallel…")
-  const [starbucks, stops] = await Promise.all([fetchStarbucks(), fetchStops()])
+  const [starbucks, stops] = await Promise.all([fetchStarbucks(), fetchStops(db)])
   console.log(`  ${starbucks.length} Starbucks from Overpass`)
   console.log(`  ${stops.length} stops from InstantDB`)
 
   console.log("Checking existing Starbucks amenities for idempotency…")
-  const alreadySeeded = await fetchExistingStarbucksStopIds()
+  const alreadySeeded = await fetchExistingStarbucksStopIds(db)
   console.log(`  ${alreadySeeded.size} stops already have a Starbucks linked`)
 
   const grid = buildGrid(stops)
@@ -202,6 +204,7 @@ async function main() {
 
   for (let i = 0; i < chunks.length; i += CONCURRENT_BATCHES) {
     const window = chunks.slice(i, i + CONCURRENT_BATCHES)
+    const windowLengths = window.map(chunk => chunk.length)  // capture before settling
 
     const results = await Promise.allSettled(
       window.map(async (chunk, windowIdx) => {
@@ -227,17 +230,18 @@ async function main() {
       })
     )
 
-    for (const result of results) {
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j]
       if (result.status === "fulfilled") {
         written += result.value ?? 0
       } else {
-        failedPairs += TXN_BATCH_SIZE
+        failedPairs += windowLengths[j]  // use actual chunk length, not TXN_BATCH_SIZE
       }
     }
 
     process.stdout.write(`  ${written}/${matchedPairs} pairs written\r`)
 
-    // Fix 5: 300ms sleep between write windows
+    // 300ms sleep between write windows
     await new Promise(r => setTimeout(r, 300))
   }
 
