@@ -20,9 +20,12 @@ export function useStationQuery(bounds: BoundingBox | null, activeFilters?: Set<
   ] : null
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const query = baseWhere ? { stops: { $: { where: { and: baseWhere as any } }, amenities: {} } } : null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const query = baseWhere ? { stops: { $: { where: { and: baseWhere as any }, limit: 100, order: { ccScore: "desc" as const } }, amenities: {} } } : null
 
   const { data, isLoading, error } = db.useQuery(query)
+
+  if (error) console.error("[useStationQuery] InstantDB error:", error)
 
   // Map InstantDB stops to Station type
   const stops = (data?.stops ?? []).map(s => ({
@@ -68,7 +71,7 @@ export function useStationQuery(bounds: BoundingBox | null, activeFilters?: Set<
     brewScoreUpdatedAt: s.brewScoreComputedAt ?? undefined,
   })) as Station[]
 
-  return { stops, isLoading, error, isStale: !!error && stops.length > 0 }
+  return { stops, isLoading: isLoading && !error, error, isStale: !!error && stops.length > 0 }
 }
 
 function formatRelativeTime(ms: number): string {
