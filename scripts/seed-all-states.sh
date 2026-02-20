@@ -36,10 +36,14 @@ for STATE in $STATES; do
       "${BASE_URL}/api/seed-stations?state=${STATE}&offset=${OFFSET}" \
       -H "x-seed-secret: ${SEED_SECRET}")
 
-    # Bail out on non-JSON (e.g. 401 Unauthorized, 500 error)
+    # Bail out on non-JSON or error responses
     if ! echo "$RESULT" | jq empty 2>/dev/null; then
       echo "  ERROR: unexpected response for ${STATE} offset=${OFFSET}: $RESULT" >&2
-      break
+      exit 1
+    fi
+    if echo "$RESULT" | jq -e '.error' > /dev/null 2>&1; then
+      echo "  ERROR: API returned error for ${STATE}: $(echo "$RESULT" | jq -r '.error')" >&2
+      exit 1
     fi
 
     INSERTED=$(echo "$RESULT" | jq '.inserted // 0')
