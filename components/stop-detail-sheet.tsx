@@ -214,7 +214,7 @@ export function StopDetailSheet({ station, isOpen, onClose }: StopDetailSheetPro
     <AuthGate
       isOpen={showGate}
       onClose={() => setShowGate(false)}
-      onSuccess={() => checkIn(station.id)}
+      pendingStopId={station.id}
     />
     </>
   )

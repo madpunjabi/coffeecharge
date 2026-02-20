@@ -12,8 +12,8 @@ const PAGE_SIZE = 200
 export const maxDuration = 300  // Vercel Pro: 5 minutes. Free: 10s — use state param to seed by state
 
 export async function POST(req: NextRequest) {
-  const adminToken = req.headers.get("x-admin-token")
-  if (adminToken !== process.env.INSTANT_ADMIN_TOKEN) {
+  const seedSecret = req.headers.get("x-seed-secret")
+  if (!process.env.SEED_SECRET || seedSecret !== process.env.SEED_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

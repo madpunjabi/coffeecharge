@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     stops: {
       $: {
         where: {
-          and: stations.map((s: Record<string, unknown>) => ({ nrelId: String(s.id) })).slice(0, 1),
+          or: stations.map((s: Record<string, unknown>) => ({ nrelId: String(s.id) })),
         },
       },
     },

@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useRef } from "react"
+import { useEffect, useLayoutEffect, useRef } from "react"
 import mapboxgl from "mapbox-gl"
 import "mapbox-gl/dist/mapbox-gl.css"
 import type { Station } from "@/lib/types"
@@ -19,12 +19,12 @@ export function MapboxMap({ stations, selectedStationId, onSelectStation, onBoun
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const stationsRef = useRef(stations)
-  stationsRef.current = stations
-  // Use refs for callbacks to avoid map remounts when parent re-renders
   const onSelectRef = useRef(onSelectStation)
-  onSelectRef.current = onSelectStation
   const onBoundsRef = useRef(onBoundsChange)
-  onBoundsRef.current = onBoundsChange
+  // Use refs for callbacks to avoid map remounts when parent re-renders
+  useLayoutEffect(() => { stationsRef.current = stations }, [stations])
+  useLayoutEffect(() => { onSelectRef.current = onSelectStation }, [onSelectStation])
+  useLayoutEffect(() => { onBoundsRef.current = onBoundsChange }, [onBoundsChange])
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return

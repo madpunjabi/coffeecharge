@@ -3,14 +3,19 @@ import { db } from "@/lib/db"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
 import { Zap } from "lucide-react"
 
+const PENDING_CHECKIN_KEY = "cc_pending_checkin"
+
 interface Props {
   isOpen: boolean
   onClose: () => void
-  onSuccess?: () => void
+  pendingStopId?: string
 }
 
-export function AuthGate({ isOpen, onClose, onSuccess }: Props) {
+export function AuthGate({ isOpen, onClose, pendingStopId }: Props) {
   const handleGoogleSignIn = () => {
+    if (pendingStopId) {
+      sessionStorage.setItem(PENDING_CHECKIN_KEY, pendingStopId)
+    }
     const url = db.auth.createAuthorizationURL({
       clientName: "google",
       redirectURL: window.location.href,
