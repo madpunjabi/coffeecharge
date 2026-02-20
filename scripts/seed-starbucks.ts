@@ -92,22 +92,29 @@ function findNearbyStops(
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 async function fetchStarbucks(): Promise<OverpassNode[]> {
-  const res = await fetch("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `data=${encodeURIComponent(OVERPASS_QUERY)}`,
-  })
-  if (!res.ok) throw new Error(`Overpass API error: ${res.status} ${res.statusText}`)
-  const json = await res.json() as { elements: OverpassNode[] }
-  return json.elements.filter(e => e.type === "node")
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 120_000)
+  try {
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `data=${encodeURIComponent(OVERPASS_QUERY)}`,
+      signal: controller.signal,
+    })
+    if (!res.ok) throw new Error(`Overpass API error: ${res.status} ${res.statusText}`)
+    const json = await res.json() as { elements: OverpassNode[] }
+    return json.elements.filter(e => e.type === "node")
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 async function fetchStops(): Promise<Stop[]> {
   const result = await db.query({ stops: {} })
   return (result.stops ?? []).map((s) => ({
-    id: s.id as string,
-    lat: s.lat as number,
-    lng: s.lng as number,
+    id: s.id,
+    lat: s.lat,
+    lng: s.lng,
   }))
 }
 
@@ -115,9 +122,9 @@ async function fetchExistingStarbucksStopIds(): Promise<Set<string>> {
   const result = await db.query({ amenities: {} })
   const seeded = new Set<string>()
   for (const a of result.amenities ?? []) {
-    const brand = (a.brand as string | null) ?? ""
+    const brand = a.brand ?? ""
     if (brand.toLowerCase().includes("starbucks")) {
-      seeded.add(a.stopId as string)
+      seeded.add(a.stopId)
     }
   }
   return seeded
@@ -125,6 +132,12 @@ async function fetchExistingStarbucksStopIds(): Promise<Set<string>> {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
+  // Fix 4: Env-var guard
+  if (!process.env.NEXT_PUBLIC_INSTANT_APP_ID || !process.env.INSTANT_ADMIN_TOKEN) {
+    console.error("Missing NEXT_PUBLIC_INSTANT_APP_ID or INSTANT_ADMIN_TOKEN in .env.local")
+    process.exit(1)
+  }
+
   console.log("Fetching Starbucks locations + stops in parallel…")
   const [starbucks, stops] = await Promise.all([fetchStarbucks(), fetchStops()])
   console.log(`  ${starbucks.length} Starbucks from Overpass`)
@@ -183,20 +196,56 @@ async function main() {
     chunks.push(allTxnGroups.slice(i, i + TXN_BATCH_SIZE))
   }
 
-  // Write CONCURRENT_BATCHES chunks at a time
+  // Write CONCURRENT_BATCHES chunks at a time, with retry logic and 300ms sleep between windows
   let written = 0
+  let failedPairs = 0
+
   for (let i = 0; i < chunks.length; i += CONCURRENT_BATCHES) {
     const window = chunks.slice(i, i + CONCURRENT_BATCHES)
-    await Promise.allSettled(
-      window.map(async (chunk) => {
-        await db.transact(chunk.flat())
-        written += chunk.length
+
+    const results = await Promise.allSettled(
+      window.map(async (chunk, windowIdx) => {
+        const maxAttempts = 3
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            await db.transact(chunk.flat())
+            return chunk.length
+          } catch (err) {
+            if (attempt === maxAttempts) {
+              console.error(
+                `\n  Chunk ${i + windowIdx} failed after ${maxAttempts} attempts:`,
+                err instanceof Error ? err.message : err
+              )
+              throw err
+            }
+            const backoffMs = 1_000 * attempt
+            await new Promise(r => setTimeout(r, backoffMs))
+          }
+        }
+        // Unreachable — satisfies TypeScript
+        throw new Error("Exhausted retries")
       })
     )
-    process.stdout.write(`  ${Math.min(written * TXN_BATCH_SIZE, matchedPairs)}/${matchedPairs} pairs written\r`)
+
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        written += result.value ?? 0
+      } else {
+        failedPairs += TXN_BATCH_SIZE
+      }
+    }
+
+    process.stdout.write(`  ${written}/${matchedPairs} pairs written\r`)
+
+    // Fix 5: 300ms sleep between write windows
+    await new Promise(r => setTimeout(r, 300))
   }
 
-  console.log(`\n✅ Done! ${matchedPairs} Starbucks amenities seeded.`)
+  if (failedPairs > 0) {
+    console.log(`\n⚠️  Done with errors. ${written} pairs written, ${failedPairs} pairs failed after all retries.`)
+  } else {
+    console.log(`\n✅ Done! ${matchedPairs} Starbucks amenities seeded.`)
+  }
 }
 
 main().catch((err) => {
